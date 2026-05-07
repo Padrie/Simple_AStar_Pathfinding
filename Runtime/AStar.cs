@@ -1,0 +1,331 @@
+using System.Collections.Generic;
+using System.Linq;
+using UnityEditor;
+using UnityEngine;
+
+namespace SimplePathfinding
+{
+    public class AStar : MonoBehaviour
+    {
+        static readonly Vector3 RAYCAST_OFFSET = new Vector3(0, 0.25f, 0);
+
+        [SerializeField] List<AStarPoint> aStarPoints;
+        [SerializeField] AStarPoint targetAStarPoint;
+        [SerializeField] float selectRandomPointAroundPlayer = 20f;
+        [SerializeField] bool drawGizmos = true;
+
+        [Header("K Nearest")]
+        [SerializeField] LayerMask obstacleMask;
+        [SerializeField] int maxNeighbors = 4;
+        [SerializeField] float initialRadius = 8f;
+        [SerializeField] float radiusStep = 8f;
+        [SerializeField] float maxRadius = 64f;
+        [SerializeField] bool useRayCast = true;
+
+        [SerializeField] Color finalPatrolPointColor = Color.blue;
+        [SerializeField] Color goodPatrolPointColor = Color.green;
+        [SerializeField] Color badPatrolPointColor = Color.yellow;
+
+        [SerializeField] List<AStarPoint> finalAStarPointPath;
+
+        [SerializeField] GameObject currentRequester;
+        [SerializeField] GameObject currentRevolver;
+
+        HashSet<AStarPoint> touchedPatrolPoints = new HashSet<AStarPoint>();
+
+        public static AStar Instance;
+
+        private void Awake()
+        {
+            Instance = this;
+
+            RefreshPatrolPoints();
+
+            aStarPoints.RemoveAll(x => !x);
+        }
+
+        private void Start()
+        {
+            if (!drawGizmos)
+            {
+                foreach (AStarPoint p in aStarPoints)
+                {
+                    p.drawGizmos = false;
+                }
+            }
+
+            GetNeighbors();
+            SelectRandomPatrolPoint();
+            GetPath();
+        }
+
+        public void GetPath()
+        {
+            ResetPatrolPoints();
+            CalculatePath();
+        }
+
+        public void UpdateGetPath()
+        {
+            ResetPatrolPoints();
+            CalculatePath();
+
+        }
+
+        public void ResetPatrolPoints()
+        {
+            foreach (var p in touchedPatrolPoints)
+                p.Reset();
+            touchedPatrolPoints.Clear();
+            finalAStarPointPath?.Clear();
+        }
+
+        //TODO: Replace FindGameObjectsWithTag with a better solution
+        public void RefreshPatrolPoints()
+        {
+            GameObject[] a = GameObject.FindGameObjectsWithTag("AStarPoints");
+            for (int i = 0; i < a.Length; i++)
+                aStarPoints.Add(a[i].GetComponent<AStarPoint>());
+
+            Debug.Log("Patrol Points refreshed. Total points: " + aStarPoints.Count);
+        }
+
+        public void CalculatePath()
+        {
+            bool calculatingPath = true;
+
+            PriorityQueue<AStarPoint> openAStarPoints = new PriorityQueue<AStarPoint>();
+            HashSet<AStarPoint> openSet = new HashSet<AStarPoint>();
+            HashSet<AStarPoint> closedAStarPoints = new HashSet<AStarPoint>();
+
+            AStarPoint startPoint = getNearestPatrolPoint(currentRequester.transform.position).GetComponent<AStarPoint>();
+            AStarPoint targetPoint = targetAStarPoint;
+
+            startPoint.Setup(0, startPoint.transform.position, targetPoint.transform.position, null);
+            startPoint.UpdateText();
+
+            //move in While loop
+            if (drawGizmos)
+            {
+                startPoint.ChangeGizmoColor(goodPatrolPointColor);
+                targetPoint.ChangeGizmoColor(finalPatrolPointColor);
+            }
+
+            openAStarPoints.Enqueue(startPoint, startPoint.GetF());
+
+            while (calculatingPath)
+            {
+                if (openAStarPoints.Count == 0)
+                {
+                    print(openAStarPoints.Count);
+                    Debug.LogWarning("Open list is empty");
+                    break;
+                }
+
+                AStarPoint currentAStarPoint = openAStarPoints.Dequeue();
+                openSet.Remove(currentAStarPoint);
+
+                if (closedAStarPoints.Contains(currentAStarPoint))
+                    continue;
+
+                closedAStarPoints.Add(currentAStarPoint);
+
+                if (currentAStarPoint == targetPoint)
+                {
+                    finalAStarPointPath = ReconstructPath(currentAStarPoint);
+                    calculatingPath = false;
+                    break;
+                }
+
+                if (currentAStarPoint.neighbors != null)
+                {
+                    foreach (AStarPoint neighbor in currentAStarPoint.neighbors)
+                    {
+                        if (neighbor == null) continue;
+                        if (closedAStarPoints.Contains(neighbor))
+                        {
+                            continue;
+                        }
+
+                        float tentativeG = currentAStarPoint.GetG() +
+                            (currentAStarPoint.pos - neighbor.pos).magnitude;
+
+                        bool isNewNode = !openSet.Contains(neighbor);
+
+                        if (isNewNode || tentativeG < neighbor.GetG())
+                        {
+                            neighbor.Setup(tentativeG, neighbor.pos, targetAStarPoint.pos, currentAStarPoint);
+                            openAStarPoints.Enqueue(neighbor, neighbor.GetF());
+
+                            if (isNewNode)
+                                openSet.Add(neighbor);
+
+                            setupVisuals(neighbor);
+                        }
+                    }
+                }
+            }
+        }
+
+        public List<AStarPoint> ReconstructPath(AStarPoint current)
+        {
+            List<AStarPoint> path = new List<AStarPoint>();
+            while (current != null)
+            {
+                path.Add(current);
+                current = current.cameFrom;
+            }
+
+            path.Reverse();
+
+            for (int i = 0; i < path.Count - 1; i++)
+            {
+                if (path[i] != null)
+                {
+                    if (path[i] != targetAStarPoint && drawGizmos)
+                        path[i].ChangeGizmoColor(goodPatrolPointColor);
+                    Debug.DrawLine(path[i].transform.position, path[i + 1].transform.position, Color.cyan, .1f);
+                }
+            }
+
+            return path;
+        }
+
+        public void GetNeighbors()
+        {
+            int n = aStarPoints.Count;
+            Vector3[] positions = new Vector3[n];
+
+            for (int i = 0; i < n; i++)
+                positions[i] = aStarPoints[i].pos;
+
+            for (int i = 0; i < n; i++)
+            {
+                AStarPoint a = aStarPoints[i];
+                a.neighbors.Clear();
+
+                float searchRadius = initialRadius;
+                List<(AStarPoint p, float dist)> validCandidates = new List<(AStarPoint p, float dist)>();
+
+                while (searchRadius <= maxRadius)
+                {
+                    validCandidates.Clear();
+                    for (int j = 0; j < n; j++)
+                    {
+                        if (i == j) continue;
+                        float sqrD = (positions[i] - positions[j]).sqrMagnitude;
+                        if (sqrD <= searchRadius * searchRadius)
+                            validCandidates.Add((aStarPoints[j], sqrD));
+                    }
+
+                    if (validCandidates.Count > 0)
+                    {
+                        validCandidates = validCandidates.OrderBy(x => x.dist).ToList();
+
+                        List<(AStarPoint p, float dist)> visible = new List<(AStarPoint p, float dist)>();
+                        foreach (var c in validCandidates)
+                        {
+                            if (visible.Count >= maxNeighbors) break;
+
+                            Vector3 from = positions[i] + RAYCAST_OFFSET;
+                            Vector3 to = c.p.pos + RAYCAST_OFFSET;
+                            Vector3 dir = to - from;
+                            float dist = dir.magnitude;
+
+                            bool blocked = false;
+                            if (useRayCast)
+                            {
+                                blocked = Physics.Raycast(from, dir.normalized, dist, obstacleMask);
+                            }
+
+                            if (!blocked)
+                                visible.Add(c);
+                        }
+
+                        if (visible.Count > 0)
+                        {
+                            foreach (var v in visible.Take(maxNeighbors))
+                            {
+                                a.neighbors.Add(v.p);
+                            }
+                            break;
+                        }
+                    }
+
+                    searchRadius += radiusStep;
+                }
+            }
+
+            for (int i = 0; i < n; i++)
+            {
+                AStarPoint a = aStarPoints[i];
+                foreach (var b in a.neighbors)
+                {
+                    if (!b.neighbors.Contains(a)) b.neighbors.Add(a);
+                }
+            }
+        }
+
+        public GameObject getNearestPatrolPoint(Vector3 pos)
+        {
+            if (aStarPoints == null || aStarPoints.Count == 0) return null;
+
+            GameObject smallestDistanceObject = aStarPoints[0].gameObject;
+            float smallestDistance = (pos - aStarPoints[0].pos).sqrMagnitude;
+
+            for (int i = 1; i < aStarPoints.Count; i++)
+            {
+                float d = (pos - aStarPoints[i].pos).sqrMagnitude;
+                if (d < smallestDistance)
+                {
+                    smallestDistance = d;
+                    smallestDistanceObject = aStarPoints[i].gameObject;
+                }
+            }
+
+            return smallestDistanceObject;
+        }
+
+        public void SelectRandomPatrolPoint()
+        {
+            if (aStarPoints == null || aStarPoints.Count == 0)
+                return;
+
+            Vector3 playerPosition = currentRevolver.transform.position;
+
+            var nearbyPoints = aStarPoints
+                .Where(p => (playerPosition - p.transform.position).sqrMagnitude <= selectRandomPointAroundPlayer * selectRandomPointAroundPlayer)
+                .ToList();
+
+            if (nearbyPoints.Count > 0)
+            {
+                targetAStarPoint = nearbyPoints[Random.Range(0, nearbyPoints.Count)];
+            }
+            else
+            {
+                var sorted = aStarPoints
+                    .OrderBy(p => (playerPosition - p.transform.position).sqrMagnitude)
+                    .Take(5)
+                    .ToList();
+
+                targetAStarPoint = sorted[Random.Range(0, sorted.Count)];
+            }
+
+            if (drawGizmos)
+                targetAStarPoint.ChangeGizmoColor(finalPatrolPointColor);
+        }
+
+        private void setupVisuals(AStarPoint neighbor)
+        {
+            if (drawGizmos)
+            {
+                if (neighbor != targetAStarPoint)
+                    neighbor.ChangeGizmoColor(badPatrolPointColor);
+
+                neighbor.UpdateText();
+            }
+
+            touchedPatrolPoints.Add(neighbor);
+        }
+    }
+}

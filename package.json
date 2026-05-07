@@ -1,0 +1,9 @@
+{
+  "name": "com.padrie.simpleastar",
+  "version": "1.0.0",
+  "displayName": "Simple A-Star",
+  "unity": "2019.1",
+  "author": {
+    "name": "Patric Strehlow",
+  }
+}
