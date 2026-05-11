@@ -13,7 +13,6 @@ namespace SimplePathfinding
 
         [HideInInspector, Tooltip("Cost of distance from starting node")] float gScore = 0;
         [HideInInspector, Tooltip("Cost of distance from end node")] float hScore = 0;
-        //[HideInInspector, Tooltip("Total estimated cost")] float fScore = 0;
         [HideInInspector] public Vector3 pos;
 
         [SerializeField] TextMeshPro gText;
@@ -45,7 +44,6 @@ namespace SimplePathfinding
         {
             SetG(g);
             SetH(neighborPos, goalPos);
-            //SetF();
             this.cameFrom = cameFrom;
         }
 
@@ -77,11 +75,6 @@ namespace SimplePathfinding
         {
             return hScore;
         }
-
-        //private void SetF()
-        //{
-        //    fScore = GetG() + hScore;
-        //}
 
         public float GetF()
         {
