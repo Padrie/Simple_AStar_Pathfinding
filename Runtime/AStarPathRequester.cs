@@ -15,7 +15,7 @@ namespace SimplePathfinding
         {
             while (true)
             {
-                AStar.Instance.GetPath();
+                //AStar.Instance.GetPath();
                 yield return new WaitForSeconds(0.01f);
             }
 

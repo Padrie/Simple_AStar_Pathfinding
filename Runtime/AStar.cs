@@ -122,7 +122,7 @@ namespace SimplePathfinding
                             if (isNewNode)
                                 openSet.Add(neighbor);
 
-                            setupVisuals(neighbor);
+                            //setupVisuals(neighbor);
                         }
                     }
                 }
@@ -135,7 +135,7 @@ namespace SimplePathfinding
             while (current != null)
             {
                 path.Add(current);
-                current = aStarPathRequest.camefrom;
+                current = aStarPathRequest.GetCameFrom(current);
             }
 
             path.Reverse();
