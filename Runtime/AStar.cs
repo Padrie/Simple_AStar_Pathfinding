@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using UnityEditor;
 using UnityEngine;
 
 namespace SimplePathfinding
@@ -10,7 +9,6 @@ namespace SimplePathfinding
         static readonly Vector3 RAYCAST_OFFSET = new Vector3(0, 0.25f, 0);
 
         [SerializeField] List<AStarPoint> aStarPoints;
-        [SerializeField] AStarPoint targetAStarPoint;
         [SerializeField] float selectRandomPointAroundPlayer = 20f;
         [SerializeField] bool drawGizmos = true;
 
@@ -26,9 +24,7 @@ namespace SimplePathfinding
         [SerializeField] Color goodPatrolPointColor = Color.green;
         [SerializeField] Color badPatrolPointColor = Color.yellow;
 
-        [SerializeField] List<AStarPoint> finalAStarPointPath;
-
-        [SerializeField] GameObject currentRequester;
+        public GameObject currentRequester;
         [SerializeField] GameObject currentRevolver;
 
         HashSet<AStarPoint> touchedPatrolPoints = new HashSet<AStarPoint>();
@@ -55,29 +51,6 @@ namespace SimplePathfinding
             }
 
             GetNeighbors();
-            SelectRandomPatrolPoint();
-            GetPath();
-        }
-
-        public void GetPath()
-        {
-            ResetPatrolPoints();
-            CalculatePath();
-        }
-
-        public void UpdateGetPath()
-        {
-            ResetPatrolPoints();
-            CalculatePath();
-
-        }
-
-        public void ResetPatrolPoints()
-        {
-            foreach (var p in touchedPatrolPoints)
-                p.Reset();
-            touchedPatrolPoints.Clear();
-            finalAStarPointPath?.Clear();
         }
 
         //TODO: Replace FindGameObjectsWithTag with a better solution
@@ -90,7 +63,7 @@ namespace SimplePathfinding
             Debug.Log("Patrol Points refreshed. Total points: " + aStarPoints.Count);
         }
 
-        public void CalculatePath()
+        public void CalculatePath(AStarPathRequest aStarPathRequest)
         {
             bool calculatingPath = true;
 
@@ -98,20 +71,10 @@ namespace SimplePathfinding
             HashSet<AStarPoint> openSet = new HashSet<AStarPoint>();
             HashSet<AStarPoint> closedAStarPoints = new HashSet<AStarPoint>();
 
-            AStarPoint startPoint = getNearestPatrolPoint(currentRequester.transform.position).GetComponent<AStarPoint>();
-            AStarPoint targetPoint = targetAStarPoint;
+            aStarPathRequest.SetCosts(aStarPathRequest.startPoint, 0, 
+                SetH(aStarPathRequest.startPoint.transform.position, aStarPathRequest.endPoint.transform.position), null);
 
-            startPoint.Setup(0, startPoint.transform.position, targetPoint.transform.position, null);
-            startPoint.UpdateText();
-
-            //move in While loop
-            if (drawGizmos)
-            {
-                startPoint.ChangeGizmoColor(goodPatrolPointColor);
-                targetPoint.ChangeGizmoColor(finalPatrolPointColor);
-            }
-
-            openAStarPoints.Enqueue(startPoint, startPoint.GetF());
+            openAStarPoints.Enqueue(aStarPathRequest.startPoint, aStarPathRequest.GetF(aStarPathRequest.startPoint));
 
             while (calculatingPath)
             {
@@ -130,9 +93,9 @@ namespace SimplePathfinding
 
                 closedAStarPoints.Add(currentAStarPoint);
 
-                if (currentAStarPoint == targetPoint)
+                if (currentAStarPoint == aStarPathRequest.endPoint)
                 {
-                    finalAStarPointPath = ReconstructPath(currentAStarPoint);
+                    aStarPathRequest.aStarPointPath = ReconstructPath(currentAStarPoint, aStarPathRequest);
                     calculatingPath = false;
                     break;
                 }
@@ -147,15 +110,14 @@ namespace SimplePathfinding
                             continue;
                         }
 
-                        float tentativeG = currentAStarPoint.GetG() +
-                            (currentAStarPoint.pos - neighbor.pos).magnitude;
+                        float tentativeG = aStarPathRequest.GetG(currentAStarPoint) + SetH(currentAStarPoint.pos, neighbor.pos);
 
                         bool isNewNode = !openSet.Contains(neighbor);
 
-                        if (isNewNode || tentativeG < neighbor.GetG())
+                        if (isNewNode || tentativeG < aStarPathRequest.GetG(neighbor))
                         {
-                            neighbor.Setup(tentativeG, neighbor.pos, targetAStarPoint.pos, currentAStarPoint);
-                            openAStarPoints.Enqueue(neighbor, neighbor.GetF());
+                            aStarPathRequest.SetCosts(neighbor, tentativeG, SetH(neighbor.pos, aStarPathRequest.endPoint.pos), currentAStarPoint);
+                            openAStarPoints.Enqueue(neighbor, aStarPathRequest.GetF(neighbor));
 
                             if (isNewNode)
                                 openSet.Add(neighbor);
@@ -167,13 +129,13 @@ namespace SimplePathfinding
             }
         }
 
-        public List<AStarPoint> ReconstructPath(AStarPoint current)
+        public List<AStarPoint> ReconstructPath(AStarPoint current, AStarPathRequest aStarPathRequest)
         {
             List<AStarPoint> path = new List<AStarPoint>();
             while (current != null)
             {
                 path.Add(current);
-                current = current.cameFrom;
+                current = aStarPathRequest.camefrom;
             }
 
             path.Reverse();
@@ -182,7 +144,7 @@ namespace SimplePathfinding
             {
                 if (path[i] != null)
                 {
-                    if (path[i] != targetAStarPoint && drawGizmos)
+                    if (path[i] != aStarPathRequest.endPoint && drawGizmos)
                         path[i].ChangeGizmoColor(goodPatrolPointColor);
                     Debug.DrawLine(path[i].transform.position, path[i + 1].transform.position, Color.cyan, .1f);
                 }
@@ -286,10 +248,10 @@ namespace SimplePathfinding
             return smallestDistanceObject;
         }
 
-        public void SelectRandomPatrolPoint()
+        public AStarPoint SelectRandomPatrolPoint()
         {
             if (aStarPoints == null || aStarPoints.Count == 0)
-                return;
+                return null;
 
             Vector3 playerPosition = currentRevolver.transform.position;
 
@@ -299,7 +261,7 @@ namespace SimplePathfinding
 
             if (nearbyPoints.Count > 0)
             {
-                targetAStarPoint = nearbyPoints[Random.Range(0, nearbyPoints.Count)];
+                return nearbyPoints[Random.Range(0, nearbyPoints.Count)];
             }
             else
             {
@@ -308,24 +270,28 @@ namespace SimplePathfinding
                     .Take(5)
                     .ToList();
 
-                targetAStarPoint = sorted[Random.Range(0, sorted.Count)];
+                return sorted[Random.Range(0, sorted.Count)];
             }
 
-            if (drawGizmos)
-                targetAStarPoint.ChangeGizmoColor(finalPatrolPointColor);
+            return null;
         }
 
-        private void setupVisuals(AStarPoint neighbor)
+        private float SetH(Vector3 a, Vector3 b)
         {
-            if (drawGizmos)
-            {
-                if (neighbor != targetAStarPoint)
-                    neighbor.ChangeGizmoColor(badPatrolPointColor);
-
-                neighbor.UpdateText();
-            }
-
-            touchedPatrolPoints.Add(neighbor);
+            return (a - b).sqrMagnitude;
         }
+
+        //private void setupVisuals(AStarPoint neighbor)
+        //{
+        //    if (drawGizmos)
+        //    {
+        //        if (neighbor != targetAStarPoint)
+        //            neighbor.ChangeGizmoColor(badPatrolPointColor);
+
+        //        neighbor.UpdateText();
+        //    }
+
+        //    touchedPatrolPoints.Add(neighbor);
+        //}
     }
 }
