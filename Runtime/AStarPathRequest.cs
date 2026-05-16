@@ -12,11 +12,12 @@ namespace SimplePathfinding
         public AStarPoint startPoint;
         public AStarPoint endPoint;
 
-        public void RequestPath(AStarPoint start, AStarPoint end)
+        public void RequestPath(AStarPoint start, AStarPoint end, Color randomColor)
         {
-            endPoint = AStar.Instance.SelectRandomPatrolPoint();
-            startPoint = AStar.Instance.getNearestPatrolPoint
-                (AStar.Instance.currentRequester.transform.position).GetComponent<AStarPoint>();
+            startPoint = start;
+            endPoint = end;
+
+            AStar.Instance.CalculatePath(this, randomColor);
         }
 
         public void SetCosts(AStarPoint point, float g, float h, AStarPoint from)
@@ -27,6 +28,7 @@ namespace SimplePathfinding
         public void ClearCosts()
         {
             storedCosts.Clear();
+            aStarPointPath.Clear();
         }
 
         public float GetG(AStarPoint point) => storedCosts.TryGetValue(point, out var costs) ? costs.g : float.MaxValue;

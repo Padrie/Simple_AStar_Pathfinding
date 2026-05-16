@@ -11,6 +11,7 @@ namespace SimplePathfinding
         [SerializeField] List<AStarPoint> aStarPoints;
         [SerializeField] float selectRandomPointAroundPlayer = 20f;
         [SerializeField] bool drawGizmos = true;
+        [SerializeField] PathFindingStyle pathfindingStyle;
 
         [Header("K Nearest")]
         [SerializeField] LayerMask obstacleMask;
@@ -19,13 +20,6 @@ namespace SimplePathfinding
         [SerializeField] float radiusStep = 8f;
         [SerializeField] float maxRadius = 64f;
         [SerializeField] bool useRayCast = true;
-
-        [SerializeField] Color finalPatrolPointColor = Color.blue;
-        [SerializeField] Color goodPatrolPointColor = Color.green;
-        [SerializeField] Color badPatrolPointColor = Color.yellow;
-
-        public GameObject currentRequester;
-        [SerializeField] GameObject currentRevolver;
 
         HashSet<AStarPoint> touchedPatrolPoints = new HashSet<AStarPoint>();
 
@@ -63,7 +57,7 @@ namespace SimplePathfinding
             Debug.Log("Patrol Points refreshed. Total points: " + aStarPoints.Count);
         }
 
-        public void CalculatePath(AStarPathRequest aStarPathRequest)
+        public void CalculatePath(AStarPathRequest aStarPathRequest, Color randomColor)
         {
             bool calculatingPath = true;
 
@@ -71,7 +65,7 @@ namespace SimplePathfinding
             HashSet<AStarPoint> openSet = new HashSet<AStarPoint>();
             HashSet<AStarPoint> closedAStarPoints = new HashSet<AStarPoint>();
 
-            aStarPathRequest.SetCosts(aStarPathRequest.startPoint, 0, 
+            aStarPathRequest.SetCosts(aStarPathRequest.startPoint, 0,
                 SetH(aStarPathRequest.startPoint.transform.position, aStarPathRequest.endPoint.transform.position), null);
 
             openAStarPoints.Enqueue(aStarPathRequest.startPoint, aStarPathRequest.GetF(aStarPathRequest.startPoint));
@@ -95,7 +89,7 @@ namespace SimplePathfinding
 
                 if (currentAStarPoint == aStarPathRequest.endPoint)
                 {
-                    aStarPathRequest.aStarPointPath = ReconstructPath(currentAStarPoint, aStarPathRequest);
+                    aStarPathRequest.aStarPointPath = ReconstructPath(currentAStarPoint, aStarPathRequest, randomColor);
                     calculatingPath = false;
                     break;
                 }
@@ -110,7 +104,7 @@ namespace SimplePathfinding
                             continue;
                         }
 
-                        float tentativeG = aStarPathRequest.GetG(currentAStarPoint) + SetH(currentAStarPoint.pos, neighbor.pos);
+                        float tentativeG = aStarPathRequest.GetG(currentAStarPoint) + Vector3.Distance(currentAStarPoint.pos, neighbor.pos);
 
                         bool isNewNode = !openSet.Contains(neighbor);
 
@@ -129,9 +123,10 @@ namespace SimplePathfinding
             }
         }
 
-        public List<AStarPoint> ReconstructPath(AStarPoint current, AStarPathRequest aStarPathRequest)
+        public List<AStarPoint> ReconstructPath(AStarPoint current, AStarPathRequest aStarPathRequest, Color randomColor)
         {
             List<AStarPoint> path = new List<AStarPoint>();
+
             while (current != null)
             {
                 path.Add(current);
@@ -144,15 +139,14 @@ namespace SimplePathfinding
             {
                 if (path[i] != null)
                 {
-                    if (path[i] != aStarPathRequest.endPoint && drawGizmos)
-                        path[i].ChangeGizmoColor(goodPatrolPointColor);
-                    Debug.DrawLine(path[i].transform.position, path[i + 1].transform.position, Color.cyan, .1f);
+                    Debug.DrawLine(path[i].transform.position, path[i + 1].transform.position, randomColor, .1f);
                 }
             }
 
             return path;
         }
 
+        [ContextMenu("Rebuild Neighbors")]
         public void GetNeighbors()
         {
             int n = aStarPoints.Count;
@@ -175,6 +169,7 @@ namespace SimplePathfinding
                     for (int j = 0; j < n; j++)
                     {
                         if (i == j) continue;
+
                         float sqrD = (positions[i] - positions[j]).sqrMagnitude;
                         if (sqrD <= searchRadius * searchRadius)
                             validCandidates.Add((aStarPoints[j], sqrD));
@@ -223,7 +218,8 @@ namespace SimplePathfinding
                 AStarPoint a = aStarPoints[i];
                 foreach (var b in a.neighbors)
                 {
-                    if (!b.neighbors.Contains(a)) b.neighbors.Add(a);
+                    if (!b.neighbors.Contains(a))
+                        b.neighbors.Add(a);
                 }
             }
         }
@@ -248,17 +244,14 @@ namespace SimplePathfinding
             return smallestDistanceObject;
         }
 
-        public AStarPoint SelectRandomPatrolPoint()
+        public AStarPoint SelectRandomPatrolPoint(Vector3 pos)
         {
             if (aStarPoints == null || aStarPoints.Count == 0)
                 return null;
 
-            Vector3 playerPosition = currentRevolver.transform.position;
-
             var nearbyPoints = aStarPoints
-                .Where(p => (playerPosition - p.transform.position).sqrMagnitude <= selectRandomPointAroundPlayer * selectRandomPointAroundPlayer)
+                .Where(p => (pos - p.transform.position).sqrMagnitude <= selectRandomPointAroundPlayer * selectRandomPointAroundPlayer)
                 .ToList();
-
             if (nearbyPoints.Count > 0)
             {
                 return nearbyPoints[Random.Range(0, nearbyPoints.Count)];
@@ -266,32 +259,55 @@ namespace SimplePathfinding
             else
             {
                 var sorted = aStarPoints
-                    .OrderBy(p => (playerPosition - p.transform.position).sqrMagnitude)
+                    .OrderBy(p => (pos - p.transform.position).sqrMagnitude)
                     .Take(5)
                     .ToList();
 
                 return sorted[Random.Range(0, sorted.Count)];
             }
-
-            return null;
         }
 
         private float SetH(Vector3 a, Vector3 b)
         {
-            return (a - b).sqrMagnitude;
+            switch (pathfindingStyle)
+            {
+                case PathFindingStyle.Grid:
+
+                    //return ManhattanDistance(a, b, 1);
+                    return (a - b).sqrMagnitude;
+                case PathFindingStyle.Linear:
+                    return (a - b).magnitude;
+                default:
+                    return (a - b).sqrMagnitude;
+            }
         }
 
-        //private void setupVisuals(AStarPoint neighbor)
-        //{
-        //    if (drawGizmos)
-        //    {
-        //        if (neighbor != targetAStarPoint)
-        //            neighbor.ChangeGizmoColor(badPatrolPointColor);
+        private float ManhattanDistance(Vector3 a, Vector3 b, float multiplier)
+        {
+            float dx = Mathf.Abs(a.x - b.x);
+            float dy = Mathf.Abs(a.y - b.y);
+            float dz = Mathf.Abs(a.z - b.z);
 
-        //        neighbor.UpdateText();
-        //    }
+            return multiplier * (dx + dy + dz);
+        }
 
-        //    touchedPatrolPoints.Add(neighbor);
-        //}
+        private bool IsDiagonal(Vector3 a, Vector3 b)
+        {
+            int count = 0;
+            if (Mathf.Abs(a.x - b.x) > 0.01f) count++;
+            if (Mathf.Abs(a.y - b.y) > 0.01f) count++;
+            if (Mathf.Abs(a.z - b.z) > 0.01f) count++;
+
+            if (count >= 2)
+            {
+                Debug.Log("More than two axes A: " + a + " B: " + b);
+                return true;
+            }
+            else
+            {
+                Debug.Log("Less than two axes A: " + a + " B: " + b);
+                return false;
+            }
+        }
     }
 }

@@ -24,15 +24,15 @@ public class AStarPointSpawner : MonoBehaviour
         float stepX = spawnRange.x / (gridResolution.x - 1);
         float stepZ = spawnRange.z / (gridResolution.y - 1);
 
-        Vector3 origin = transform.position - new Vector3(spawnRange.x / 2f, 0f, spawnRange.z / 2f);
+        Vector3 origin = transform.position - new Vector3(spawnRange.x / 2f, 100f, spawnRange.z / 2f);
 
         for (int x = 0; x < gridResolution.x; x++)
         {
             for (int z = 0; z < gridResolution.y; z++)
             {
-                Vector3 pointPos = origin + new Vector3(x * stepX, 0f, z * stepZ);
+                Vector3 pointPos = origin + new Vector3(x * stepX, 1f, z * stepZ);
 
-                if (Physics.Raycast(pointPos + Vector3.up * 10f, Vector3.down, out RaycastHit hit, 50f))
+                if (Physics.Raycast(pointPos + Vector3.up * 100f, Vector3.down, out RaycastHit hit, 50f))
                     pointPos.y = hit.point.y;
                 else
                     pointPos.y = transform.position.y;
