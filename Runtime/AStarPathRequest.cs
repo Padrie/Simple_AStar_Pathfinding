@@ -6,13 +6,13 @@ namespace SimplePathfinding
 {
     public class AStarPathRequest
     {
-        public Dictionary<AStarPoint, (float g,float h, AStarPoint cameFrom)> storedCosts = new();
-        public List<AStarPoint> aStarPointPath = new();
+        public Dictionary<IAStarPoint, (float g,float h, IAStarPoint cameFrom)> storedCosts = new();
+        public List<IAStarPoint> aStarPointPath = new();
 
-        public AStarPoint startPoint;
-        public AStarPoint endPoint;
+        public IAStarPoint startPoint;
+        public IAStarPoint endPoint;
 
-        public void RequestPath(AStarPoint start, AStarPoint end, Color randomColor)
+        public void RequestPath(IAStarPoint start, IAStarPoint end, Color randomColor)
         {
             startPoint = start;
             endPoint = end;
@@ -20,7 +20,7 @@ namespace SimplePathfinding
             AStar.Instance.CalculatePath(this, randomColor);
         }
 
-        public void SetCosts(AStarPoint point, float g, float h, AStarPoint from)
+        public void SetCosts(IAStarPoint point, float g, float h, IAStarPoint from)
         {
             storedCosts[point] = (g,h, from);
         }
@@ -31,9 +31,9 @@ namespace SimplePathfinding
             aStarPointPath.Clear();
         }
 
-        public float GetG(AStarPoint point) => storedCosts.TryGetValue(point, out var costs) ? costs.g : float.MaxValue;
-        public float GetH(AStarPoint point) => storedCosts.TryGetValue(point, out var costs) ? costs.h : float.MaxValue;
-        public float GetF(AStarPoint point) => storedCosts.TryGetValue(point, out var costs) ? costs.g + costs.h : float.MaxValue;
-        public AStarPoint GetCameFrom(AStarPoint point) => storedCosts.TryGetValue(point, out var costs) ? costs.cameFrom : null;
+        public float GetG(IAStarPoint point) => storedCosts.TryGetValue(point, out var costs) ? costs.g : float.MaxValue;
+        public float GetH(IAStarPoint point) => storedCosts.TryGetValue(point, out var costs) ? costs.h : float.MaxValue;
+        public float GetF(IAStarPoint point) => storedCosts.TryGetValue(point, out var costs) ? costs.g + costs.h : float.MaxValue;
+        public IAStarPoint GetCameFrom(IAStarPoint point) => storedCosts.TryGetValue(point, out var costs) ? costs.cameFrom : null;
     }
 }

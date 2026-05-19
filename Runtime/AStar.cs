@@ -8,7 +8,7 @@ namespace SimplePathfinding
     {
         static readonly Vector3 RAYCAST_OFFSET = new Vector3(0, 0.25f, 0);
 
-        [SerializeField] List<AStarPoint> aStarPoints;
+        [SerializeField] List<IAStarPoint> aStarPoints = new();
         [SerializeField] float selectRandomPointAroundPlayer = 20f;
         [SerializeField] bool drawGizmos = true;
         [SerializeField] PathFindingStyle pathfindingStyle;
@@ -21,7 +21,7 @@ namespace SimplePathfinding
         [SerializeField] float maxRadius = 64f;
         [SerializeField] bool useRayCast = true;
 
-        HashSet<AStarPoint> touchedPatrolPoints = new HashSet<AStarPoint>();
+        HashSet<IAStarPoint> touchedPatrolPoints = new HashSet<IAStarPoint>();
 
         public static AStar Instance;
 
@@ -31,19 +31,11 @@ namespace SimplePathfinding
 
             RefreshPatrolPoints();
 
-            aStarPoints.RemoveAll(x => !x);
+            aStarPoints.RemoveAll(x => x == null);
         }
 
         private void Start()
         {
-            if (!drawGizmos)
-            {
-                foreach (AStarPoint p in aStarPoints)
-                {
-                    p.drawGizmos = false;
-                }
-            }
-
             GetNeighbors();
         }
 
@@ -52,7 +44,12 @@ namespace SimplePathfinding
         {
             GameObject[] a = GameObject.FindGameObjectsWithTag("AStarPoints");
             for (int i = 0; i < a.Length; i++)
-                aStarPoints.Add(a[i].GetComponent<AStarPoint>());
+                aStarPoints.Add(a[i].GetComponent<IAStarPoint>());
+
+            int nullCount = 0;
+            foreach (var p in aStarPoints)
+                if (p == null) nullCount++;
+            Debug.Log("Null points: " + nullCount);
 
             Debug.Log("Patrol Points refreshed. Total points: " + aStarPoints.Count);
         }
@@ -61,12 +58,12 @@ namespace SimplePathfinding
         {
             bool calculatingPath = true;
 
-            PriorityQueue<AStarPoint> openAStarPoints = new PriorityQueue<AStarPoint>();
-            HashSet<AStarPoint> openSet = new HashSet<AStarPoint>();
-            HashSet<AStarPoint> closedAStarPoints = new HashSet<AStarPoint>();
+            PriorityQueue<IAStarPoint> openAStarPoints = new PriorityQueue<IAStarPoint>();
+            HashSet<IAStarPoint> openSet = new HashSet<IAStarPoint>();
+            HashSet<IAStarPoint> closedAStarPoints = new HashSet<IAStarPoint>();
 
             aStarPathRequest.SetCosts(aStarPathRequest.startPoint, 0,
-                SetH(aStarPathRequest.startPoint.transform.position, aStarPathRequest.endPoint.transform.position), null);
+                SetH(aStarPathRequest.startPoint.Position, aStarPathRequest.endPoint.Position), null);
 
             openAStarPoints.Enqueue(aStarPathRequest.startPoint, aStarPathRequest.GetF(aStarPathRequest.startPoint));
 
@@ -79,7 +76,7 @@ namespace SimplePathfinding
                     break;
                 }
 
-                AStarPoint currentAStarPoint = openAStarPoints.Dequeue();
+                IAStarPoint currentAStarPoint = openAStarPoints.Dequeue();
                 openSet.Remove(currentAStarPoint);
 
                 if (closedAStarPoints.Contains(currentAStarPoint))
@@ -94,9 +91,9 @@ namespace SimplePathfinding
                     break;
                 }
 
-                if (currentAStarPoint.neighbors != null)
+                if (currentAStarPoint.Neighbors != null)
                 {
-                    foreach (AStarPoint neighbor in currentAStarPoint.neighbors)
+                    foreach (IAStarPoint neighbor in currentAStarPoint.Neighbors)
                     {
                         if (neighbor == null) continue;
                         if (closedAStarPoints.Contains(neighbor))
@@ -104,13 +101,13 @@ namespace SimplePathfinding
                             continue;
                         }
 
-                        float tentativeG = aStarPathRequest.GetG(currentAStarPoint) + Vector3.Distance(currentAStarPoint.pos, neighbor.pos);
+                        float tentativeG = aStarPathRequest.GetG(currentAStarPoint) + Vector3.Distance(currentAStarPoint.Position, neighbor.Position);
 
                         bool isNewNode = !openSet.Contains(neighbor);
 
                         if (isNewNode || tentativeG < aStarPathRequest.GetG(neighbor))
                         {
-                            aStarPathRequest.SetCosts(neighbor, tentativeG, SetH(neighbor.pos, aStarPathRequest.endPoint.pos), currentAStarPoint);
+                            aStarPathRequest.SetCosts(neighbor, tentativeG, SetH(neighbor.Position, aStarPathRequest.endPoint.Position), currentAStarPoint);
                             openAStarPoints.Enqueue(neighbor, aStarPathRequest.GetF(neighbor));
 
                             if (isNewNode)
@@ -123,9 +120,9 @@ namespace SimplePathfinding
             }
         }
 
-        public List<AStarPoint> ReconstructPath(AStarPoint current, AStarPathRequest aStarPathRequest, Color randomColor)
+        public List<IAStarPoint> ReconstructPath(IAStarPoint current, AStarPathRequest aStarPathRequest, Color randomColor)
         {
-            List<AStarPoint> path = new List<AStarPoint>();
+            List<IAStarPoint> path = new List<IAStarPoint>();
 
             while (current != null)
             {
@@ -139,7 +136,7 @@ namespace SimplePathfinding
             {
                 if (path[i] != null)
                 {
-                    Debug.DrawLine(path[i].transform.position, path[i + 1].transform.position, randomColor, .1f);
+                    Debug.DrawLine(path[i].Position, path[i + 1].Position, randomColor, .1f);
                 }
             }
 
@@ -153,15 +150,15 @@ namespace SimplePathfinding
             Vector3[] positions = new Vector3[n];
 
             for (int i = 0; i < n; i++)
-                positions[i] = aStarPoints[i].pos;
+                positions[i] = aStarPoints[i].Position;
 
             for (int i = 0; i < n; i++)
             {
-                AStarPoint a = aStarPoints[i];
-                a.neighbors.Clear();
+                IAStarPoint a = aStarPoints[i];
+                a.Neighbors.Clear();
 
                 float searchRadius = initialRadius;
-                List<(AStarPoint p, float dist)> validCandidates = new List<(AStarPoint p, float dist)>();
+                List<(IAStarPoint p, float dist)> validCandidates = new List<(IAStarPoint p, float dist)>();
 
                 while (searchRadius <= maxRadius)
                 {
@@ -179,13 +176,13 @@ namespace SimplePathfinding
                     {
                         validCandidates = validCandidates.OrderBy(x => x.dist).ToList();
 
-                        List<(AStarPoint p, float dist)> visible = new List<(AStarPoint p, float dist)>();
+                        List<(IAStarPoint p, float dist)> visible = new List<(IAStarPoint p, float dist)>();
                         foreach (var c in validCandidates)
                         {
                             if (visible.Count >= maxNeighbors) break;
 
                             Vector3 from = positions[i] + RAYCAST_OFFSET;
-                            Vector3 to = c.p.pos + RAYCAST_OFFSET;
+                            Vector3 to = c.p.Position + RAYCAST_OFFSET;
                             Vector3 dir = to - from;
                             float dist = dir.magnitude;
 
@@ -203,7 +200,7 @@ namespace SimplePathfinding
                         {
                             foreach (var v in visible.Take(maxNeighbors))
                             {
-                                a.neighbors.Add(v.p);
+                                a.Neighbors.Add(v.p);
                             }
                             break;
                         }
@@ -215,42 +212,42 @@ namespace SimplePathfinding
 
             for (int i = 0; i < n; i++)
             {
-                AStarPoint a = aStarPoints[i];
-                foreach (var b in a.neighbors)
+                IAStarPoint a = aStarPoints[i];
+                foreach (var b in a.Neighbors)
                 {
-                    if (!b.neighbors.Contains(a))
-                        b.neighbors.Add(a);
+                    if (!b.Neighbors.Contains(a))
+                        b.Neighbors.Add(a);
                 }
             }
         }
 
-        public GameObject getNearestPatrolPoint(Vector3 pos)
+        public IAStarPoint getNearestPatrolPoint(Vector3 pos)
         {
             if (aStarPoints == null || aStarPoints.Count == 0) return null;
 
-            GameObject smallestDistanceObject = aStarPoints[0].gameObject;
-            float smallestDistance = (pos - aStarPoints[0].pos).sqrMagnitude;
+            IAStarPoint smallestDistanceObject = aStarPoints[0];
+            float smallestDistance = (pos - aStarPoints[0].Position).sqrMagnitude;
 
             for (int i = 1; i < aStarPoints.Count; i++)
             {
-                float d = (pos - aStarPoints[i].pos).sqrMagnitude;
+                float d = (pos - aStarPoints[i].Position).sqrMagnitude;
                 if (d < smallestDistance)
                 {
                     smallestDistance = d;
-                    smallestDistanceObject = aStarPoints[i].gameObject;
+                    smallestDistanceObject = aStarPoints[i];
                 }
             }
 
             return smallestDistanceObject;
         }
 
-        public AStarPoint SelectRandomPatrolPoint(Vector3 pos)
+        public IAStarPoint SelectRandomPatrolPoint(Vector3 pos)
         {
             if (aStarPoints == null || aStarPoints.Count == 0)
                 return null;
 
             var nearbyPoints = aStarPoints
-                .Where(p => (pos - p.transform.position).sqrMagnitude <= selectRandomPointAroundPlayer * selectRandomPointAroundPlayer)
+                .Where(p => (pos - p.Position).sqrMagnitude <= selectRandomPointAroundPlayer * selectRandomPointAroundPlayer)
                 .ToList();
             if (nearbyPoints.Count > 0)
             {
@@ -259,7 +256,7 @@ namespace SimplePathfinding
             else
             {
                 var sorted = aStarPoints
-                    .OrderBy(p => (pos - p.transform.position).sqrMagnitude)
+                    .OrderBy(p => (pos - p.Position).sqrMagnitude)
                     .Take(5)
                     .ToList();
 
