@@ -39,6 +39,11 @@ namespace SimplePathfinding
             return false;
         }
 
+        public void Clear()
+        {
+            heap.Clear();
+        }
+
         private void HeapifyUp(int idx)
         {
             while (idx > 0)

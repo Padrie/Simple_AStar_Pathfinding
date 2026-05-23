@@ -6,5 +6,8 @@ namespace SimplePathfinding
     {
         Grid,
         Linear,
+        Weight1,
+        Weight2,
+        Weight3
     }
 }

@@ -38,7 +38,7 @@ namespace SimplePathfinding
             while (true)
             {
                 aStarPathRequest.RequestPath(
-                    AStar.Instance.getNearestPatrolPoint(transform.position), randomPoint, randomColor);
+                    AStar.Instance.GetNearestPoint(transform.position), randomPoint, randomColor);
 
                 yield return new WaitForSeconds(0.1f);
 

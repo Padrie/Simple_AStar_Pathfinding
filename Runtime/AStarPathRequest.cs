@@ -12,6 +12,10 @@ namespace SimplePathfinding
         public IAStarPoint startPoint;
         public IAStarPoint endPoint;
 
+        public PriorityQueue<IAStarPoint> openAStarPoints = new PriorityQueue<IAStarPoint>();
+        public HashSet<IAStarPoint> openSet = new HashSet<IAStarPoint>();
+        public HashSet<IAStarPoint> closedAStarPoints = new HashSet<IAStarPoint>();
+
         public void RequestPath(IAStarPoint start, IAStarPoint end, Color randomColor)
         {
             startPoint = start;
@@ -29,6 +33,9 @@ namespace SimplePathfinding
         {
             storedCosts.Clear();
             aStarPointPath.Clear();
+            openAStarPoints.Clear();
+            openSet.Clear();
+            closedAStarPoints.Clear();
         }
 
         public float GetG(IAStarPoint point) => storedCosts.TryGetValue(point, out var costs) ? costs.g : float.MaxValue;

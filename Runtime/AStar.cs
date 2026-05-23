@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using UnityEngine;
 
 namespace SimplePathfinding
@@ -8,81 +9,144 @@ namespace SimplePathfinding
     {
         static readonly Vector3 RAYCAST_OFFSET = new Vector3(0, 0.25f, 0);
 
-        [SerializeField] List<IAStarPoint> aStarPoints = new();
+        List<IAStarPoint> aStarPoints = new();
         [SerializeField] float selectRandomPointAroundPlayer = 20f;
         [SerializeField] bool drawGizmos = true;
         [SerializeField] PathFindingStyle pathfindingStyle;
 
         [Header("K Nearest")]
         [SerializeField] LayerMask obstacleMask;
-        [SerializeField] int maxNeighbors = 4;
-        [SerializeField] float initialRadius = 8f;
-        [SerializeField] float radiusStep = 8f;
-        [SerializeField] float maxRadius = 64f;
+        [SerializeField] int maxNeighbors = 6;
+        [SerializeField] float initialRadius = 2f;
+        [SerializeField] float radiusStep = 2f;
+        [SerializeField] float maxRadius = 8f;
         [SerializeField] bool useRayCast = true;
 
-        HashSet<IAStarPoint> touchedPatrolPoints = new HashSet<IAStarPoint>();
-
         public static AStar Instance;
+
+        [SerializeField, HideInInspector] List<AStarPoint> waypointList = new List<AStarPoint>();
+        [SerializeField, HideInInspector] List<AStarGridPoint> gridpointList = new List<AStarGridPoint>();
+        [SerializeField, HideInInspector] List<AStarGrid> gridList = new List<AStarGrid>();
 
         private void Awake()
         {
             Instance = this;
 
-            RefreshPatrolPoints();
+            RefreshPoints();
+            PopulatePointList();
 
             aStarPoints.RemoveAll(x => x == null);
         }
 
         private void Start()
         {
-            GetNeighbors();
+            GetWaypointNeighbors();
+            GetGridNeighbors();
+
+            ConnectNeighbors();
+            ConnectGridBoundries();
         }
 
-        //TODO: Replace FindGameObjectsWithTag with a better solution
+        [ContextMenu("Start Setup")]
+        public void SetupPoints()
+        {
+            RefreshPatrolPoints();
+            RefreshGridPoints();
+
+            GetWaypointNeighbors();
+            GetGridNeighbors();
+
+            ConnectNeighbors();
+            ConnectGridBoundries();
+        }
+
+        [ContextMenu("Get Points")]
+        public void RefreshPoints()
+        {
+            RefreshPatrolPoints();
+            RefreshGridPoints();
+            Debug.Log("Points refreshed. Total points: " + aStarPoints.Count);
+        }
+
         public void RefreshPatrolPoints()
         {
-            GameObject[] a = GameObject.FindGameObjectsWithTag("AStarPoints");
-            for (int i = 0; i < a.Length; i++)
-                aStarPoints.Add(a[i].GetComponent<IAStarPoint>());
+            var points = FindObjectsByType<AStarPoint>();
+            waypointList.Clear();
 
-            int nullCount = 0;
-            foreach (var p in aStarPoints)
-                if (p == null) nullCount++;
-            Debug.Log("Null points: " + nullCount);
+            for (int i = 0; i < points.Length; i++)
+            {
+                waypointList.Add(points[i]);
+            }
 
-            Debug.Log("Patrol Points refreshed. Total points: " + aStarPoints.Count);
+            Debug.Log("Way Points refreshed. Total points: " + waypointList.Count);
+        }
+
+        public void RefreshGridPoints()
+        {
+            var grids = FindObjectsByType<AStarGrid>();
+            gridpointList.Clear();
+            gridList.Clear();
+
+            for (int i = 0; i < grids.Length; i++)
+            {
+                var points = grids[i].GetGridPoints();
+                gridList.Add(grids[i]);
+
+                for (int j = 0; j < points.Count; j++)
+                {
+                    gridpointList.Add(points[j]);
+                }
+            }
+
+            print("Grid Points refreshed. Total points: " + gridpointList.Count);
+        }
+
+        public void PopulatePointList()
+        {
+            aStarPoints.Clear();
+            aStarPoints.AddRange(waypointList);
+            aStarPoints.AddRange(gridpointList);
+        }
+
+        [ContextMenu("Clear point lists")]
+        public void ClearPoints()
+        {
+            for (int i = 0; i < aStarPoints.Count; i++)
+            {
+                aStarPoints[i].Neighbors.Clear();
+            }
+
+            gridpointList.Clear();
+            waypointList.Clear();
+            aStarPoints.Clear();
+            gridList.Clear();
         }
 
         public void CalculatePath(AStarPathRequest aStarPathRequest, Color randomColor)
         {
             bool calculatingPath = true;
 
-            PriorityQueue<IAStarPoint> openAStarPoints = new PriorityQueue<IAStarPoint>();
-            HashSet<IAStarPoint> openSet = new HashSet<IAStarPoint>();
-            HashSet<IAStarPoint> closedAStarPoints = new HashSet<IAStarPoint>();
-
             aStarPathRequest.SetCosts(aStarPathRequest.startPoint, 0,
-                SetH(aStarPathRequest.startPoint.Position, aStarPathRequest.endPoint.Position), null);
+                    SetH(aStarPathRequest.startPoint.Position, aStarPathRequest.endPoint.Position), null);
 
-            openAStarPoints.Enqueue(aStarPathRequest.startPoint, aStarPathRequest.GetF(aStarPathRequest.startPoint));
+            aStarPathRequest.openAStarPoints.Enqueue(
+                aStarPathRequest.startPoint, aStarPathRequest.GetF(aStarPathRequest.startPoint));
 
             while (calculatingPath)
             {
-                if (openAStarPoints.Count == 0)
+                if (aStarPathRequest.openAStarPoints.Count == 0)
                 {
-                    print(openAStarPoints.Count);
                     Debug.LogWarning("Open list is empty");
                     break;
                 }
 
-                IAStarPoint currentAStarPoint = openAStarPoints.Dequeue();
-                openSet.Remove(currentAStarPoint);
+                IAStarPoint currentAStarPoint = aStarPathRequest.openAStarPoints.Dequeue();
+                aStarPathRequest.openSet.Remove(currentAStarPoint);
 
-                if (closedAStarPoints.Contains(currentAStarPoint))
+                if (aStarPathRequest.closedAStarPoints.Contains(currentAStarPoint))
                     continue;
 
-                closedAStarPoints.Add(currentAStarPoint);
+                aStarPathRequest.closedAStarPoints.Add(currentAStarPoint);
 
                 if (currentAStarPoint == aStarPathRequest.endPoint)
                 {
@@ -96,24 +160,22 @@ namespace SimplePathfinding
                     foreach (IAStarPoint neighbor in currentAStarPoint.Neighbors)
                     {
                         if (neighbor == null) continue;
-                        if (closedAStarPoints.Contains(neighbor))
+                        if (aStarPathRequest.closedAStarPoints.Contains(neighbor))
                         {
                             continue;
                         }
 
                         float tentativeG = aStarPathRequest.GetG(currentAStarPoint) + Vector3.Distance(currentAStarPoint.Position, neighbor.Position);
 
-                        bool isNewNode = !openSet.Contains(neighbor);
+                        bool isNewNode = !aStarPathRequest.openSet.Contains(neighbor);
 
                         if (isNewNode || tentativeG < aStarPathRequest.GetG(neighbor))
                         {
                             aStarPathRequest.SetCosts(neighbor, tentativeG, SetH(neighbor.Position, aStarPathRequest.endPoint.Position), currentAStarPoint);
-                            openAStarPoints.Enqueue(neighbor, aStarPathRequest.GetF(neighbor));
+                            aStarPathRequest.openAStarPoints.Enqueue(neighbor, aStarPathRequest.GetF(neighbor));
 
                             if (isNewNode)
-                                openSet.Add(neighbor);
-
-                            //setupVisuals(neighbor);
+                                aStarPathRequest.openSet.Add(neighbor);
                         }
                     }
                 }
@@ -143,18 +205,17 @@ namespace SimplePathfinding
             return path;
         }
 
-        [ContextMenu("Rebuild Neighbors")]
-        public void GetNeighbors()
+        public void GetWaypointNeighbors()
         {
-            int n = aStarPoints.Count;
+            int n = waypointList.Count;
             Vector3[] positions = new Vector3[n];
 
             for (int i = 0; i < n; i++)
-                positions[i] = aStarPoints[i].Position;
+                positions[i] = waypointList[i].Position;
 
             for (int i = 0; i < n; i++)
             {
-                IAStarPoint a = aStarPoints[i];
+                IAStarPoint a = waypointList[i];
                 a.Neighbors.Clear();
 
                 float searchRadius = initialRadius;
@@ -169,7 +230,7 @@ namespace SimplePathfinding
 
                         float sqrD = (positions[i] - positions[j]).sqrMagnitude;
                         if (sqrD <= searchRadius * searchRadius)
-                            validCandidates.Add((aStarPoints[j], sqrD));
+                            validCandidates.Add((waypointList[j], sqrD));
                     }
 
                     if (validCandidates.Count > 0)
@@ -212,7 +273,7 @@ namespace SimplePathfinding
 
             for (int i = 0; i < n; i++)
             {
-                IAStarPoint a = aStarPoints[i];
+                IAStarPoint a = waypointList[i];
                 foreach (var b in a.Neighbors)
                 {
                     if (!b.Neighbors.Contains(a))
@@ -221,7 +282,144 @@ namespace SimplePathfinding
             }
         }
 
-        public IAStarPoint getNearestPatrolPoint(Vector3 pos)
+        public void GetGridNeighbors()
+        {
+            foreach (var grid in gridList)
+            {
+                Vector3Int[] directions = new Vector3Int[]
+                {
+                    new Vector3Int(grid.cellSize, 0, 0),
+                    new Vector3Int(-grid.cellSize, 0, 0),
+                    new Vector3Int(0, grid.cellSize, 0),
+                    new Vector3Int(0, -grid.cellSize, 0),
+                    new Vector3Int(0, 0, grid.cellSize),
+                    new Vector3Int(0, 0, -grid.cellSize)
+                };
+
+                foreach (var point in grid.storedGridPoints)
+                {
+                    for (int i = 0; i < directions.Length; i++)
+                    {
+                        if (grid.storedGridPoints.TryGetValue(point.Key + directions[i], out var neighbor))
+                        {
+                            AddGridNeighbor(point.Value, neighbor, directions[i], grid.cellSize);
+                        }
+                    }
+                }
+
+                int totalNeighbors = 0;
+                foreach (var point in grid.storedGridPoints)
+                    totalNeighbors += point.Value.Neighbors.Count;
+            }
+        }
+
+        void ConnectGridBoundries()
+        {
+            foreach (var gridA in gridList)
+            {
+                Vector3Int[] directions = new Vector3Int[]
+                {
+                    new Vector3Int(gridA.cellSize, 0, 0),
+                    new Vector3Int(-gridA.cellSize, 0, 0),
+                    new Vector3Int(0, gridA.cellSize, 0),
+                    new Vector3Int(0, -gridA.cellSize, 0),
+                    new Vector3Int(0, 0, gridA.cellSize),
+                    new Vector3Int(0, 0, -gridA.cellSize)
+                };
+
+                foreach (var point in gridA.storedGridPoints)
+                {
+                    foreach (var gridB in gridList)
+                    {
+                        if (gridA == gridB) continue;
+
+                        if (gridA.cellSize != gridB.cellSize)
+                        {
+                            Debug.LogWarning("Grid " + gridA.name + " and " + gridB.name + 
+                                " have different cell sizes. This may cause connection issues.");
+                        }
+
+                        for (int i = 0; i < directions.Length; i++)
+                        {
+                            if (gridB.storedGridPoints.TryGetValue(point.Key + directions[i], out var neighbor))
+                            {
+                                AddGridNeighbor(point.Value, neighbor, directions[i], gridB.cellSize);
+                            }
+                        }
+
+                    }
+                }
+            }
+        }
+
+        void AddGridNeighbor(AStarGridPoint currentPoint, AStarGridPoint neighbor, Vector3 dir, int length)
+        {
+            Vector3 from = currentPoint.Position + dir.normalized * 0.1f;
+
+            bool blocked = false;
+            if (useRayCast)
+            {
+                blocked = Physics.Raycast(from, dir.normalized, length, obstacleMask);
+            }
+
+            if (!blocked)
+            {
+                if (!currentPoint.Neighbors.Contains(neighbor))
+                    currentPoint.Neighbors.Add(neighbor);
+                if (!neighbor.Neighbors.Contains(currentPoint))
+                    neighbor.Neighbors.Add(currentPoint);
+            }
+        }
+
+        public void ConnectNeighbors()
+        {
+            foreach (var waypoint in waypointList)
+            {
+                foreach (var gridpoint in gridpointList)
+                {
+                    Vector3 from = waypoint.Position + RAYCAST_OFFSET;
+                    Vector3 to = gridpoint.Position + RAYCAST_OFFSET;
+                    Vector3 dir = to - from;
+                    float dist = dir.magnitude;
+                    float sqrDist = (waypoint.Position - gridpoint.Position).sqrMagnitude;
+
+                    if (sqrDist > initialRadius * initialRadius) continue;
+
+                    bool blocked = false;
+                    if (useRayCast)
+                    {
+                        blocked = Physics.Raycast(from, dir.normalized, dist, obstacleMask);
+                    }
+
+                    if (!blocked)
+                    {
+                        if (!waypoint.Neighbors.Contains(gridpoint))
+                            waypoint.Neighbors.Add(gridpoint);
+                        if (!gridpoint.Neighbors.Contains(waypoint))
+                            gridpoint.Neighbors.Add(waypoint);
+                    }
+                }
+            }
+        }
+
+        public IAStarPoint GetNearestPoint(Vector3 pos)
+        {
+            foreach (var grid in gridList)
+            {
+                if (grid.IsAgentInGridVolume(pos))
+                {
+                    var gridPoint = GetNearestGridPoint(pos, grid);
+                    if (gridPoint != null)
+                    {
+                        return gridPoint;
+                    }
+                }
+            }
+
+            return GetNearestWayPoint(pos);
+        }
+
+        public IAStarPoint GetNearestWayPoint(Vector3 pos)
         {
             if (aStarPoints == null || aStarPoints.Count == 0) return null;
 
@@ -241,27 +439,23 @@ namespace SimplePathfinding
             return smallestDistanceObject;
         }
 
+        public IAStarPoint GetNearestGridPoint(Vector3 pos, AStarGrid grid)
+        {
+            Vector3Int origin = grid.GetOrigin();
+            Vector3Int nearestKey = new Vector3Int(
+                Mathf.RoundToInt((pos.x - origin.x) / grid.cellSize) * grid.cellSize + origin.x,
+                Mathf.RoundToInt((pos.y - origin.y) / grid.cellSize) * grid.cellSize + origin.y,
+                Mathf.RoundToInt((pos.z - origin.z) / grid.cellSize) * grid.cellSize + origin.z);
+
+            grid.storedGridPoints.TryGetValue(nearestKey, out var nearestPoint);
+
+            if (nearestPoint != null) return nearestPoint;
+            else return null;
+        }
+
         public IAStarPoint SelectRandomPatrolPoint(Vector3 pos)
         {
-            if (aStarPoints == null || aStarPoints.Count == 0)
-                return null;
-
-            var nearbyPoints = aStarPoints
-                .Where(p => (pos - p.Position).sqrMagnitude <= selectRandomPointAroundPlayer * selectRandomPointAroundPlayer)
-                .ToList();
-            if (nearbyPoints.Count > 0)
-            {
-                return nearbyPoints[Random.Range(0, nearbyPoints.Count)];
-            }
-            else
-            {
-                var sorted = aStarPoints
-                    .OrderBy(p => (pos - p.Position).sqrMagnitude)
-                    .Take(5)
-                    .ToList();
-
-                return sorted[Random.Range(0, sorted.Count)];
-            }
+            return aStarPoints[Random.Range(0, aStarPoints.Count - 1)];
         }
 
         private float SetH(Vector3 a, Vector3 b)
@@ -269,11 +463,14 @@ namespace SimplePathfinding
             switch (pathfindingStyle)
             {
                 case PathFindingStyle.Grid:
-
                     //return ManhattanDistance(a, b, 1);
                     return (a - b).sqrMagnitude;
                 case PathFindingStyle.Linear:
                     return (a - b).magnitude;
+                case PathFindingStyle.Weight2:
+                    return (a - b).magnitude * 2;
+                case PathFindingStyle.Weight3:
+                    return (a - b).magnitude * 3;
                 default:
                     return (a - b).sqrMagnitude;
             }
@@ -297,12 +494,10 @@ namespace SimplePathfinding
 
             if (count >= 2)
             {
-                Debug.Log("More than two axes A: " + a + " B: " + b);
                 return true;
             }
             else
             {
-                Debug.Log("Less than two axes A: " + a + " B: " + b);
                 return false;
             }
         }

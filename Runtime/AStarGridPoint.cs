@@ -1,8 +1,10 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 namespace SimplePathfinding
 {
+    [Serializable]
     public class AStarGridPoint : IAStarPoint
     {
         bool isWalkable = true;
