@@ -54,8 +54,6 @@ namespace SimplePathfinding
 
             origin = pos - new Vector3Int(gridSize.x / 2, gridSize.y / 2, gridSize.z / 2);
 
-            Debug.Log("Origin set to: " + origin);
-
             for (int x = 0; x < gridSize.x / cellSize; x++)
             {
                 for (int z = 0; z < gridSize.z / cellSize; z++)
@@ -78,6 +76,8 @@ namespace SimplePathfinding
                     }
                 }
             }
+
+            print(storedGridPoints.Count);
         }
 
         public List<AStarGridPoint> GetGridPoints()

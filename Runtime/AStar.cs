@@ -1,6 +1,5 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
 using UnityEngine;
 
 namespace SimplePathfinding
@@ -32,19 +31,32 @@ namespace SimplePathfinding
         {
             Instance = this;
 
-            RefreshPoints();
+            //RefreshPoints();
             PopulatePointList();
+
+            foreach (var grid in gridList)
+                grid.storedGridPoints.Clear();
+
+            foreach (var point in gridpointList)
+                foreach (var grid in gridList)
+                    if (grid.IsAgentInGridVolume(point.Position))
+                    {
+                        grid.storedGridPoints[Vector3Int.RoundToInt(point.Position)] = point;
+                        break;
+                    }
 
             aStarPoints.RemoveAll(x => x == null);
         }
 
         private void Start()
         {
-            GetWaypointNeighbors();
-            GetGridNeighbors();
+            //GetWaypointNeighbors();
+            //GetGridNeighbors();
 
-            ConnectNeighbors();
-            ConnectGridBoundries();
+            //ConnectNeighbors();
+            //ConnectGridBoundries();
+
+            PopulatePointNeighbors();
         }
 
         [ContextMenu("Start Setup")]
@@ -58,6 +70,8 @@ namespace SimplePathfinding
 
             ConnectNeighbors();
             ConnectGridBoundries();
+
+            SaveNeighborKeys();
         }
 
         [ContextMenu("Get Points")]
@@ -106,6 +120,81 @@ namespace SimplePathfinding
             aStarPoints.Clear();
             aStarPoints.AddRange(waypointList);
             aStarPoints.AddRange(gridpointList);
+        }
+
+        public void PopulatePointNeighbors()
+        {
+            Dictionary<Vector3, IAStarPoint> allPoints = new();
+
+            foreach (var point in gridpointList)
+            {
+                allPoints[Vector3Int.RoundToInt(point.Position)] = point;
+            }
+
+            foreach (var waypoint in waypointList)
+            {
+                allPoints[waypoint.Position] = waypoint;
+            }
+
+            foreach (var point in gridpointList)
+            {
+                if (point == null) continue;
+
+                foreach (var neighborPos in point.serializedNeighbors)
+                {
+                    if (allPoints.TryGetValue(neighborPos, out var neighbor))
+                    {
+                        point.Neighbors.Add(neighbor);
+                        continue;
+                    }
+
+                    Vector3Int vec = Vector3Int.RoundToInt(neighborPos);
+                    if (allPoints.TryGetValue(vec, out var roundedNeighbor))
+                        point.Neighbors.Add(roundedNeighbor);
+                }
+            }
+
+            foreach (var waypoint in waypointList)
+            {
+                foreach (var neighborPos in waypoint.serializedNeighbors)
+                {
+                    if (allPoints.TryGetValue(neighborPos, out var neighbor))
+                    {
+                        waypoint.Neighbors.Add(neighbor);
+                        continue;
+                    }
+
+                    Vector3Int vec = Vector3Int.RoundToInt(neighborPos);
+                    if (allPoints.TryGetValue(vec, out var roundedNeighbor))
+                        waypoint.Neighbors.Add(roundedNeighbor);
+                }
+            }
+
+            foreach (var waypoint in waypointList)
+            {
+                print(waypoint.Neighbors.Count);
+            }
+        }
+
+        public void SaveNeighborKeys()
+        {
+            foreach (var point in waypointList)
+            {
+                point.serializedNeighbors.Clear();
+                foreach (var neighbor in point.Neighbors)
+                {
+                    point.serializedNeighbors.Add(neighbor.Position);
+                }
+            }
+
+            foreach (var point in gridpointList)
+            {
+                point.serializedNeighbors.Clear();
+                foreach (var neighbor in point.Neighbors)
+                {
+                    point.serializedNeighbors.Add(neighbor.Position);
+                }
+            }
         }
 
         [ContextMenu("Clear point lists")]
@@ -293,7 +382,11 @@ namespace SimplePathfinding
                     new Vector3Int(0, grid.cellSize, 0),
                     new Vector3Int(0, -grid.cellSize, 0),
                     new Vector3Int(0, 0, grid.cellSize),
-                    new Vector3Int(0, 0, -grid.cellSize)
+                    new Vector3Int(0, 0, -grid.cellSize),
+                    new Vector3Int(grid.cellSize, 0, grid.cellSize),
+                    new Vector3Int(grid.cellSize, 0, -grid.cellSize),
+                    new Vector3Int(-grid.cellSize, 0, grid.cellSize),
+                    new Vector3Int(-grid.cellSize, 0, -grid.cellSize)
                 };
 
                 foreach (var point in grid.storedGridPoints)
@@ -311,6 +404,20 @@ namespace SimplePathfinding
                 foreach (var point in grid.storedGridPoints)
                     totalNeighbors += point.Value.Neighbors.Count;
             }
+
+            int diagonalConnections = 0;
+            foreach (var point in gridpointList)
+                foreach (var neighbor in point.Neighbors)
+                {
+                    var diff = neighbor.Position - point.Position;
+                    // diagonal = differs on 2+ axes
+                    int axisCount = 0;
+                    if (Mathf.Abs(diff.x) > 0.01f) axisCount++;
+                    if (Mathf.Abs(diff.y) > 0.01f) axisCount++;
+                    if (Mathf.Abs(diff.z) > 0.01f) axisCount++;
+                    if (axisCount >= 2) diagonalConnections++;
+                }
+            Debug.Log("Diagonal connections: " + diagonalConnections);
         }
 
         void ConnectGridBoundries()
@@ -324,7 +431,11 @@ namespace SimplePathfinding
                     new Vector3Int(0, gridA.cellSize, 0),
                     new Vector3Int(0, -gridA.cellSize, 0),
                     new Vector3Int(0, 0, gridA.cellSize),
-                    new Vector3Int(0, 0, -gridA.cellSize)
+                    new Vector3Int(0, 0, -gridA.cellSize),
+                    new Vector3Int(gridA.cellSize, 0, gridA.cellSize),
+                    new Vector3Int(gridA.cellSize, 0, -gridA.cellSize),
+                    new Vector3Int(-gridA.cellSize, 0, gridA.cellSize),
+                    new Vector3Int(-gridA.cellSize, 0, -gridA.cellSize)
                 };
 
                 foreach (var point in gridA.storedGridPoints)
@@ -335,7 +446,7 @@ namespace SimplePathfinding
 
                         if (gridA.cellSize != gridB.cellSize)
                         {
-                            Debug.LogWarning("Grid " + gridA.name + " and " + gridB.name + 
+                            Debug.LogWarning("Grid " + gridA.name + " and " + gridB.name +
                                 " have different cell sizes. This may cause connection issues.");
                         }
 
@@ -359,7 +470,7 @@ namespace SimplePathfinding
             bool blocked = false;
             if (useRayCast)
             {
-                blocked = Physics.Raycast(from, dir.normalized, length, obstacleMask);
+                blocked = Physics.Raycast(from, dir.normalized, dir.magnitude, obstacleMask);
             }
 
             if (!blocked)
@@ -473,32 +584,6 @@ namespace SimplePathfinding
                     return (a - b).magnitude * 3;
                 default:
                     return (a - b).sqrMagnitude;
-            }
-        }
-
-        private float ManhattanDistance(Vector3 a, Vector3 b, float multiplier)
-        {
-            float dx = Mathf.Abs(a.x - b.x);
-            float dy = Mathf.Abs(a.y - b.y);
-            float dz = Mathf.Abs(a.z - b.z);
-
-            return multiplier * (dx + dy + dz);
-        }
-
-        private bool IsDiagonal(Vector3 a, Vector3 b)
-        {
-            int count = 0;
-            if (Mathf.Abs(a.x - b.x) > 0.01f) count++;
-            if (Mathf.Abs(a.y - b.y) > 0.01f) count++;
-            if (Mathf.Abs(a.z - b.z) > 0.01f) count++;
-
-            if (count >= 2)
-            {
-                return true;
-            }
-            else
-            {
-                return false;
             }
         }
     }

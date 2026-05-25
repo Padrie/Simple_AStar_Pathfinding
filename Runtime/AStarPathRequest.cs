@@ -22,6 +22,10 @@ namespace SimplePathfinding
             endPoint = end;
 
             AStar.Instance.CalculatePath(this, randomColor);
+
+            //Debug.Log("Start: " + start.Position + " is " + start.GetType());
+            //Debug.Log("End: " + end.Position + " is " + end.GetType());
+            //Debug.Log("Start neighbors: " + start.Neighbors.Count);
         }
 
         public void SetCosts(IAStarPoint point, float g, float h, IAStarPoint from)

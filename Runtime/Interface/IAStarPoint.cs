@@ -6,7 +6,8 @@ namespace SimplePathfinding
     public interface IAStarPoint
     {
         Vector3 Position { get; }
-        bool Walkable { get; set; }
         List<IAStarPoint> Neighbors { get; }
+        bool Walkable { get; set; }
+        float Weight { get; set; }
     }
 }
