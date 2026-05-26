@@ -13,6 +13,10 @@ namespace SimplePathfinding
         [SerializeField] bool drawGizmos = true;
         [SerializeField] PathFindingStyle pathfindingStyle;
 
+        [Header("Chunk Settings")]
+        [SerializeField] int chunkSize = 10;
+        [SerializeField] Dictionary<Vector3Int, PointChunk> waypointChunks = new();
+
         [Header("K Nearest")]
         [SerializeField] LayerMask obstacleMask;
         [SerializeField] int maxNeighbors = 6;
@@ -120,6 +124,23 @@ namespace SimplePathfinding
             aStarPoints.Clear();
             aStarPoints.AddRange(waypointList);
             aStarPoints.AddRange(gridpointList);
+        }
+
+        public void PopulateWaypointChunks()
+        {
+            waypointChunks.Clear();
+
+            foreach (var waypoint in waypointList)
+            {
+                Vector3Int chunkPos = ConvertToChunkCoord(waypoint.Position);
+
+
+
+                if (waypointChunks.TryGetValue(chunkPos, out var chunk))
+                {
+                    chunk.pointList.Add(waypoint);
+                }
+            }
         }
 
         public void PopulatePointNeighbors()
@@ -585,6 +606,15 @@ namespace SimplePathfinding
                 default:
                     return (a - b).sqrMagnitude;
             }
+        }
+
+        private Vector3Int ConvertToChunkCoord(Vector3 pos)
+        {
+            int x = Mathf.FloorToInt(pos.x / chunkSize);
+            int y = Mathf.FloorToInt(pos.x / chunkSize);
+            int z = Mathf.FloorToInt(pos.x / chunkSize);
+
+            return new Vector3Int(x, y, z);
         }
     }
 }
