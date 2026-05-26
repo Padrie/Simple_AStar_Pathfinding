@@ -8,7 +8,7 @@ namespace SimplePathfinding
     [Serializable]
     public class PointChunk
     {
-        public List<AStarPoint> pointList = new();
+        public List<WayPoint> pointList = new();
         public Vector3Int chunkCoord;
 
         public PointChunk(Vector3Int coord)

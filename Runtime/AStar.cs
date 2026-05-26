@@ -27,8 +27,8 @@ namespace SimplePathfinding
 
         public static AStar Instance;
 
-        [SerializeField, HideInInspector] List<AStarPoint> waypointList = new List<AStarPoint>();
-        [SerializeField, HideInInspector] List<AStarGridPoint> gridpointList = new List<AStarGridPoint>();
+        [SerializeField, HideInInspector] List<WayPoint> waypointList = new List<WayPoint>();
+        [SerializeField, HideInInspector] List<GridPoint> gridpointList = new List<GridPoint>();
         [SerializeField, HideInInspector] List<AStarGrid> gridList = new List<AStarGrid>();
 
         private void Awake()
@@ -37,6 +37,7 @@ namespace SimplePathfinding
 
             //RefreshPoints();
             PopulatePointList();
+            PopulateWaypointChunks();
 
             foreach (var grid in gridList)
                 grid.storedGridPoints.Clear();
@@ -88,7 +89,7 @@ namespace SimplePathfinding
 
         public void RefreshPatrolPoints()
         {
-            var points = FindObjectsByType<AStarPoint>();
+            var points = FindObjectsByType<WayPoint>();
             waypointList.Clear();
 
             for (int i = 0; i < points.Length; i++)
@@ -134,11 +135,15 @@ namespace SimplePathfinding
             {
                 Vector3Int chunkPos = ConvertToChunkCoord(waypoint.Position);
 
-
-
                 if (waypointChunks.TryGetValue(chunkPos, out var chunk))
                 {
                     chunk.pointList.Add(waypoint);
+                }
+                else
+                {
+                    PointChunk newChunk = new PointChunk(chunkPos);
+                    waypointChunks.Add(chunkPos, newChunk);
+                    newChunk.pointList.Add(waypoint);
                 }
             }
         }
@@ -234,6 +239,12 @@ namespace SimplePathfinding
 
         public void CalculatePath(AStarPathRequest aStarPathRequest, Color randomColor)
         {
+            if (aStarPathRequest.startPoint == null || aStarPathRequest.endPoint == null)
+            {
+                Debug.LogWarning("Path request has null start or end point");
+                return;
+            }
+
             bool calculatingPath = true;
 
             aStarPathRequest.SetCosts(aStarPathRequest.startPoint, 0,
@@ -275,7 +286,8 @@ namespace SimplePathfinding
                             continue;
                         }
 
-                        float tentativeG = aStarPathRequest.GetG(currentAStarPoint) + Vector3.Distance(currentAStarPoint.Position, neighbor.Position);
+                        float tentativeG = aStarPathRequest.GetG(currentAStarPoint)
+                            + Vector3.Distance(currentAStarPoint.Position, neighbor.Position) * neighbor.Weight;
 
                         bool isNewNode = !aStarPathRequest.openSet.Contains(neighbor);
 
@@ -484,7 +496,7 @@ namespace SimplePathfinding
             }
         }
 
-        void AddGridNeighbor(AStarGridPoint currentPoint, AStarGridPoint neighbor, Vector3 dir, int length)
+        void AddGridNeighbor(GridPoint currentPoint, GridPoint neighbor, Vector3 dir, int length)
         {
             Vector3 from = currentPoint.Position + dir.normalized * 0.1f;
 
@@ -555,18 +567,38 @@ namespace SimplePathfinding
         {
             if (aStarPoints == null || aStarPoints.Count == 0) return null;
 
-            IAStarPoint smallestDistanceObject = aStarPoints[0];
-            float smallestDistance = (pos - aStarPoints[0].Position).sqrMagnitude;
+            IAStarPoint smallestDistanceObject = null;
+            float smallestDistance = float.MaxValue;
+            Vector3Int baseCoord = ConvertToChunkCoord(pos);
 
-            for (int i = 1; i < aStarPoints.Count; i++)
+            Debug.Log("Agent pos: " + pos + " base chunk: " + baseCoord);
+            Debug.Log("Total chunks: " + waypointChunks.Count);
+
+            for (int x = -1; x <= 1; x++)
             {
-                float d = (pos - aStarPoints[i].Position).sqrMagnitude;
-                if (d < smallestDistance)
+                for (int y = -1; y <= 1; y++)
                 {
-                    smallestDistance = d;
-                    smallestDistanceObject = aStarPoints[i];
+                    for (int z = -1; z <= 1; z++)
+                    {
+                        Vector3Int agentChunkCoord = baseCoord + new Vector3Int(x, y, z);
+                        if (waypointChunks.TryGetValue(agentChunkCoord, out var chunk))
+                        {
+                            for (int i = 0; i < chunk.pointList.Count; i++)
+                            {
+                                float d = (pos - chunk.pointList[i].Position).sqrMagnitude;
+
+                                if (d < smallestDistance)
+                                {
+                                    smallestDistance = d;
+                                    smallestDistanceObject = chunk.pointList[i];
+                                }
+                            }
+                        }
+                    }
                 }
             }
+
+            Debug.Log("Found: " + (smallestDistanceObject != null));
 
             return smallestDistanceObject;
         }
@@ -611,8 +643,8 @@ namespace SimplePathfinding
         private Vector3Int ConvertToChunkCoord(Vector3 pos)
         {
             int x = Mathf.FloorToInt(pos.x / chunkSize);
-            int y = Mathf.FloorToInt(pos.x / chunkSize);
-            int z = Mathf.FloorToInt(pos.x / chunkSize);
+            int y = Mathf.FloorToInt(pos.y / chunkSize);
+            int z = Mathf.FloorToInt(pos.z / chunkSize);
 
             return new Vector3Int(x, y, z);
         }

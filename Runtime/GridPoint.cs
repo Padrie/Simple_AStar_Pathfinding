@@ -5,9 +5,10 @@ using UnityEngine;
 namespace SimplePathfinding
 {
     [Serializable]
-    public class AStarGridPoint : IAStarPoint
+    public class GridPoint : IAStarPoint
     {
         bool isWalkable = true;
+        float weight = 1f;
         [HideInInspector] public List<Vector3> serializedNeighbors = new();
         [System.NonSerialized] List<IAStarPoint> neighbors = new();
         [SerializeField, HideInInspector] Vector3 pos;
@@ -18,16 +19,17 @@ namespace SimplePathfinding
 
         public List<IAStarPoint> Neighbors => neighbors;
 
-        public float Weight { get; set; }
+        public float Weight { get => weight; set => weight = Mathf.Clamp(value, 0.5f, 2f); }
 
-        public AStarGridPoint()
+        public GridPoint()
         {
             neighbors = new List<IAStarPoint>();
         }
 
-        public AStarGridPoint(Vector3 position)
+        public GridPoint(Vector3 position)
         {
             pos = position;
+            neighbors = new List<IAStarPoint>();
         }
     }
 }

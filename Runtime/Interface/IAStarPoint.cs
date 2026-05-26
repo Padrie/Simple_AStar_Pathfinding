@@ -8,6 +8,6 @@ namespace SimplePathfinding
         Vector3 Position { get; }
         List<IAStarPoint> Neighbors { get; }
         bool Walkable { get; set; }
-        float Weight { get; set; }
+        float Weight { get ; set; }
     }
 }

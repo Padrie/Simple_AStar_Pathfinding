@@ -11,7 +11,7 @@ namespace SimplePathfinding
         public Vector3Int gridSize = new Vector3Int(20, 20, 20);
         public int cellSize = 2;
 
-        public Dictionary<Vector3Int, AStarGridPoint> storedGridPoints = new();
+        public Dictionary<Vector3Int, GridPoint> storedGridPoints = new();
         [SerializeField, HideInInspector] List<Vector3Int> pointPositions = new List<Vector3Int>();
 
         public bool drawGizmos = true;
@@ -32,7 +32,7 @@ namespace SimplePathfinding
         {
             for (int i = 0; i < pointPositions.Count; i++)
             {
-                AStarGridPoint gridPoint = new AStarGridPoint(pointPositions[i]);
+                GridPoint gridPoint = new GridPoint(pointPositions[i]);
                 if (storedGridPoints.ContainsKey(pointPositions[i]))
                     continue;
                 storedGridPoints.Add(pointPositions[i], gridPoint);
@@ -69,7 +69,7 @@ namespace SimplePathfinding
                             if ((obstacleMask & (1 << hit.collider.gameObject.layer)) != 0)
                                 continue;
 
-                            AStarGridPoint gridPoint = new AStarGridPoint(pointPos);
+                            GridPoint gridPoint = new GridPoint(pointPos);
                             storedGridPoints.Add(pointPos, gridPoint);
                             pointPositions.Add(pointPos);
                         }
@@ -80,7 +80,7 @@ namespace SimplePathfinding
             print(storedGridPoints.Count);
         }
 
-        public List<AStarGridPoint> GetGridPoints()
+        public List<GridPoint> GetGridPoints()
         {
             return storedGridPoints.Values.ToList();
         }

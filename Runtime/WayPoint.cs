@@ -4,9 +4,10 @@ using UnityEngine;
 
 namespace SimplePathfinding
 {
-    public class AStarPoint : MonoBehaviour, IAStarPoint
+    public class WayPoint : MonoBehaviour, IAStarPoint
     {
-        bool isWalkable = true;
+        public bool isWalkable = true;
+        [Range(0.5f, 2f)]public float weight = 1f;
         [HideInInspector] public List<Vector3> serializedNeighbors = new();
         [System.NonSerialized] List<IAStarPoint> neighbors = new();
 
@@ -16,7 +17,7 @@ namespace SimplePathfinding
 
         public List<IAStarPoint> Neighbors => neighbors;
 
-        public float Weight { get; set; }
+        public float Weight { get => weight; set => weight = Mathf.Clamp(value, 0.5f, 2f); }
 
     }
 }
