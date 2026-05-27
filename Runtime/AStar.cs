@@ -579,9 +579,6 @@ namespace SimplePathfinding
             float smallestDistance = float.MaxValue;
             Vector3Int baseCoord = ConvertToChunkCoord(pos);
 
-            Debug.Log("Agent pos: " + pos + " base chunk: " + baseCoord);
-            Debug.Log("Total chunks: " + waypointChunks.Count);
-
             for (int x = -1; x <= 1; x++)
             {
                 for (int y = -1; y <= 1; y++)
@@ -606,8 +603,6 @@ namespace SimplePathfinding
                 }
             }
 
-            Debug.Log("Found: " + (smallestDistanceObject != null));
-
             return smallestDistanceObject;
         }
 
@@ -620,14 +615,6 @@ namespace SimplePathfinding
                 Mathf.RoundToInt((pos.z - origin.z) / grid.cellSize) * grid.cellSize + origin.z);
 
             grid.storedGridPoints.TryGetValue(nearestKey, out var nearestPoint);
-
-            if (nearestPoint != null)
-            {
-                int typeCount = 0;
-                for (int i = 0; i < 30; i++)
-                    if (nearestPoint.AllowedAgentTypes[i]) typeCount++;
-                Debug.Log("Returned grid point from " + grid.name + " has " + typeCount + " types");
-            }
 
             if (nearestPoint != null) return nearestPoint;
             else return null;

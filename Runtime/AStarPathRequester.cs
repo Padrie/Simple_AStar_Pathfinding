@@ -51,7 +51,7 @@ namespace SimplePathfinding
             {
                 aStarPathRequest.ClearCosts();
                 aStarPathRequest.RequestPath(
-                    AStar.Instance.GetNearestPoint(transform.position), endPoint, randomColor, agentTypes);
+                    AStar.Instance.GetNearestPoint(transform.position), randomPoint, randomColor, agentTypes);
                 yield return new WaitForSeconds(0.1f);
 
             }
