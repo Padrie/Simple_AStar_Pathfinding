@@ -17,7 +17,7 @@ namespace SimplePathfinding
 
         public T Dequeue()
         {
-            if (heap.Count == 0) throw new InvalidOperationException("PQ empty");
+            if (heap.Count == 0) return default;
 
             T top = heap[0].item;
 

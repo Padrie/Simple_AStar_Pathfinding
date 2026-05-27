@@ -25,17 +25,18 @@ namespace SimplePathfinding
         [SerializeField] float maxRadius = 8f;
         [SerializeField] bool useRayCast = true;
 
+        [HideInInspector] public string[] agentTypes = new string[30];
+
         public static AStar Instance;
 
-        [SerializeField, HideInInspector] List<WayPoint> waypointList = new List<WayPoint>();
-        [SerializeField, HideInInspector] List<GridPoint> gridpointList = new List<GridPoint>();
+        [HideInInspector] public List<WayPoint> waypointList = new List<WayPoint>();
+        [HideInInspector] public List<GridPoint> gridpointList = new List<GridPoint>();
         [SerializeField, HideInInspector] List<AStarGrid> gridList = new List<AStarGrid>();
 
         private void Awake()
         {
             Instance = this;
 
-            //RefreshPoints();
             PopulatePointList();
             PopulateWaypointChunks();
 
@@ -64,7 +65,6 @@ namespace SimplePathfinding
             PopulatePointNeighbors();
         }
 
-        [ContextMenu("Start Setup")]
         public void SetupPoints()
         {
             RefreshPatrolPoints();
@@ -79,11 +79,11 @@ namespace SimplePathfinding
             SaveNeighborKeys();
         }
 
-        [ContextMenu("Get Points")]
         public void RefreshPoints()
         {
             RefreshPatrolPoints();
             RefreshGridPoints();
+
             Debug.Log("Points refreshed. Total points: " + aStarPoints.Count);
         }
 
@@ -195,11 +195,6 @@ namespace SimplePathfinding
                         waypoint.Neighbors.Add(roundedNeighbor);
                 }
             }
-
-            foreach (var waypoint in waypointList)
-            {
-                print(waypoint.Neighbors.Count);
-            }
         }
 
         public void SaveNeighborKeys()
@@ -223,7 +218,6 @@ namespace SimplePathfinding
             }
         }
 
-        [ContextMenu("Clear point lists")]
         public void ClearPoints()
         {
             for (int i = 0; i < aStarPoints.Count; i++)
@@ -258,10 +252,10 @@ namespace SimplePathfinding
                 if (aStarPathRequest.openAStarPoints.Count == 0)
                 {
                     Debug.LogWarning("Open list is empty");
-                    break;
                 }
 
                 IAStarPoint currentAStarPoint = aStarPathRequest.openAStarPoints.Dequeue();
+                if (currentAStarPoint == null) break;
                 aStarPathRequest.openSet.Remove(currentAStarPoint);
 
                 if (aStarPathRequest.closedAStarPoints.Contains(currentAStarPoint))
@@ -286,8 +280,23 @@ namespace SimplePathfinding
                             continue;
                         }
 
-                        float tentativeG = aStarPathRequest.GetG(currentAStarPoint)
-                            + Vector3.Distance(currentAStarPoint.Position, neighbor.Position) * neighbor.Weight;
+                        bool allowed = false;
+                        for (int i = 0; i < 30; i++)
+                        {
+                            if (aStarPathRequest.agentTypes[i] && neighbor.AllowedAgentTypes[i])
+                            {
+                                allowed = true;
+                                break;
+                            }
+                        }
+                        if (!allowed) continue;
+
+                        float crossSystemMultiplier = 1f;
+                        if ((currentAStarPoint is WayPoint) != (neighbor is WayPoint))
+                            crossSystemMultiplier = 1.5f;
+
+                        float tentativeG = aStarPathRequest.GetG(currentAStarPoint) +
+                            Vector3.Distance(currentAStarPoint.Position, neighbor.Position) * neighbor.Weight * crossSystemMultiplier;
 
                         bool isNewNode = !aStarPathRequest.openSet.Contains(neighbor);
 
@@ -450,7 +459,6 @@ namespace SimplePathfinding
                     if (Mathf.Abs(diff.z) > 0.01f) axisCount++;
                     if (axisCount >= 2) diagonalConnections++;
                 }
-            Debug.Log("Diagonal connections: " + diagonalConnections);
         }
 
         void ConnectGridBoundries()
@@ -613,6 +621,14 @@ namespace SimplePathfinding
 
             grid.storedGridPoints.TryGetValue(nearestKey, out var nearestPoint);
 
+            if (nearestPoint != null)
+            {
+                int typeCount = 0;
+                for (int i = 0; i < 30; i++)
+                    if (nearestPoint.AllowedAgentTypes[i]) typeCount++;
+                Debug.Log("Returned grid point from " + grid.name + " has " + typeCount + " types");
+            }
+
             if (nearestPoint != null) return nearestPoint;
             else return null;
         }
@@ -626,17 +642,14 @@ namespace SimplePathfinding
         {
             switch (pathfindingStyle)
             {
-                case PathFindingStyle.Grid:
-                    //return ManhattanDistance(a, b, 1);
-                    return (a - b).sqrMagnitude;
-                case PathFindingStyle.Linear:
+                case PathFindingStyle.Weight1:
                     return (a - b).magnitude;
                 case PathFindingStyle.Weight2:
                     return (a - b).magnitude * 2;
                 case PathFindingStyle.Weight3:
                     return (a - b).magnitude * 3;
                 default:
-                    return (a - b).sqrMagnitude;
+                    return (a - b).magnitude;
             }
         }
 

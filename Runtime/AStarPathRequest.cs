@@ -16,16 +16,31 @@ namespace SimplePathfinding
         public HashSet<IAStarPoint> openSet = new HashSet<IAStarPoint>();
         public HashSet<IAStarPoint> closedAStarPoints = new HashSet<IAStarPoint>();
 
-        public void RequestPath(IAStarPoint start, IAStarPoint end, Color randomColor)
+        [HideInInspector] public bool[] agentTypes = new bool[30];
+
+        public void RequestPath(IAStarPoint start, IAStarPoint end, Color randomColor, bool[] agentTypes)
         {
+            if (start == null || end == null)
+            {
+                Debug.LogWarning("RequestPath: start or end is null");
+                return;
+            }
+
+            bool startAllowed = false;
+            for (int i = 0; i < 30; i++)
+                if (agentTypes[i] && start.AllowedAgentTypes[i]) { startAllowed = true; break; }
+
+            if (!startAllowed)
+            {
+                Debug.LogWarning("Start point doesn't allow agent type");
+                return;
+            }
+
             startPoint = start;
             endPoint = end;
+            this.agentTypes = agentTypes;
 
             AStar.Instance.CalculatePath(this, randomColor);
-
-            //Debug.Log("Start: " + start.Position + " is " + start.GetType());
-            //Debug.Log("End: " + end.Position + " is " + end.GetType());
-            //Debug.Log("Start neighbors: " + start.Neighbors.Count);
         }
 
         public void SetCosts(IAStarPoint point, float g, float h, IAStarPoint from)

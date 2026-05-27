@@ -25,6 +25,7 @@ namespace SimplePathfinding
         Vector3Int pos;
         Vector3Int origin;
         [SerializeField, HideInInspector] int originalCellSize;
+        [HideInInspector] public bool[] allowedAgentTypes = new bool[30];
 
         public void OnBeforeSerialize() {}
 
@@ -45,8 +46,7 @@ namespace SimplePathfinding
             pos = Vector3Int.RoundToInt(transform.position);
         }
 
-        [ContextMenu("Spawn Grid Points")]
-        private void SpawnGridPoints()
+        public void SpawnGridPoints()
         {
             storedGridPoints.Clear();
             pointPositions.Clear();
@@ -70,14 +70,13 @@ namespace SimplePathfinding
                                 continue;
 
                             GridPoint gridPoint = new GridPoint(pointPos);
+                            gridPoint.allowedAgentTypes = (bool[])allowedAgentTypes.Clone();
                             storedGridPoints.Add(pointPos, gridPoint);
                             pointPositions.Add(pointPos);
                         }
                     }
                 }
             }
-
-            print(storedGridPoints.Count);
         }
 
         public List<GridPoint> GetGridPoints()
@@ -85,17 +84,10 @@ namespace SimplePathfinding
             return storedGridPoints.Values.ToList();
         }
 
-        [ContextMenu("Clear Dictionary")]
-        private void ClearDictionary()
+        public void ClearDictionary()
         {
             storedGridPoints.Clear();
             pointPositions.Clear();
-        }
-
-        [ContextMenu("Print Coords")]
-        private void PrintCoords()
-        {
-            print(storedGridPoints.Count);
         }
 
         public bool IsAgentInGridVolume(Vector3 pos)
