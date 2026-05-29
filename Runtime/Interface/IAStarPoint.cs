@@ -9,6 +9,6 @@ namespace SimplePathfinding
         List<IAStarPoint> Neighbors { get; }
         bool Walkable { get; set; }
         float Weight { get ; set; }
-        bool[] AllowedAgentTypes { get; }
+        bool[] AllowedAgentTypes { get; set; }
     }
 }

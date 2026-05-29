@@ -22,7 +22,7 @@ namespace SimplePathfinding
 
         public float Weight { get => weight; set => weight = Mathf.Clamp(value, 0.5f, 2f); }
 
-        public bool[] AllowedAgentTypes => allowedAgentTypes;
+        public bool[] AllowedAgentTypes { get => allowedAgentTypes; set => allowedAgentTypes = value; }
 
         public GridPoint()
         {

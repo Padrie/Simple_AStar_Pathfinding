@@ -26,6 +26,8 @@ namespace SimplePathfinding
                 GUI.enabled = false;
             }
 
+            EditorGUI.BeginChangeCheck();
+
             if (allowedTypesFoldout)
             {
                 AStar astar = FindAnyObjectByType<AStar>();
@@ -52,10 +54,8 @@ namespace SimplePathfinding
                 EditorGUILayout.EndScrollView();
             }
 
-            if (GUI.changed)
-            {
+            if (EditorGUI.EndChangeCheck())
                 EditorUtility.SetDirty(wayPoint);
-            }
 
             GUI.enabled = true;
         }

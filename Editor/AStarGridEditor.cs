@@ -20,9 +20,13 @@ namespace SimplePathfinding
             EditorGUILayout.Space();
             allowedTypesFoldout = EditorGUILayout.Foldout(allowedTypesFoldout, "Allowed Agent Types", true);
 
+            EditorGUI.BeginChangeCheck();
+
             if (allowedTypesFoldout)
             {
-                AStar astar = FindAnyObjectByType<AStar>();
+                if (astar == null)
+                    astar = FindAnyObjectByType<AStar>();
+
                 if (astar == null)
                 {
                     EditorGUILayout.HelpBox("No AStar instance found in scene", MessageType.Warning);
@@ -46,10 +50,8 @@ namespace SimplePathfinding
                 EditorGUILayout.EndScrollView();
             }
 
-            if (GUI.changed)
-            {
+            if (EditorGUI.EndChangeCheck())
                 EditorUtility.SetDirty(aStarGrid);
-            }
 
             EditorGUILayout.LabelField("Stored Points: " + aStarGrid.storedGridPoints.Count);
 

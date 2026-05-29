@@ -24,6 +24,8 @@ namespace SimplePathfinding
                 GUI.enabled = false;
             }
 
+            EditorGUI.BeginChangeCheck();
+
             if (agentTypesFoldout)
             {
                 agentTypesScroll = EditorGUILayout.BeginScrollView(agentTypesScroll, GUILayout.Height(200));
@@ -41,10 +43,8 @@ namespace SimplePathfinding
                 EditorGUILayout.EndScrollView();
             }
 
-            if (GUI.changed)
-            {
+            if (EditorGUI.EndChangeCheck())
                 EditorUtility.SetDirty(astar);
-            }
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Stored GridPoints: " + astar.gridpointList.Count);

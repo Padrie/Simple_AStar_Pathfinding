@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace SimplePathfinding
@@ -18,29 +19,21 @@ namespace SimplePathfinding
 
         [HideInInspector] public bool[] agentTypes = new bool[30];
 
-        public void RequestPath(IAStarPoint start, IAStarPoint end, Color randomColor, bool[] agentTypes)
+        public async Task RequestPathAsync(IAStarPoint start, IAStarPoint end, bool[] agentTypes)
         {
-            if (start == null || end == null)
-            {
-                Debug.LogWarning("RequestPath: start or end is null");
-                return;
-            }
+            if (start == null || end == null) return;
 
             bool startAllowed = false;
             for (int i = 0; i < 30; i++)
                 if (agentTypes[i] && start.AllowedAgentTypes[i]) { startAllowed = true; break; }
 
-            if (!startAllowed)
-            {
-                Debug.LogWarning("Start point doesn't allow agent type");
-                return;
-            }
-
+            if (!startAllowed) return;
+            
             startPoint = start;
             endPoint = end;
             this.agentTypes = agentTypes;
 
-            AStar.Instance.CalculatePath(this, randomColor);
+            await Task.Run(() => AStar.Instance.CalculatePath(this));
         }
 
         public void SetCosts(IAStarPoint point, float g, float h, IAStarPoint from)

@@ -8,4 +8,11 @@ namespace SimplePathfinding
         Weight2,
         Weight3
     }
+
+    public enum FilterVolumeMode
+    {
+        Once,
+        Realtime,
+        Volume
+    }
 }

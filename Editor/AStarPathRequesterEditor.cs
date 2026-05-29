@@ -28,6 +28,8 @@ namespace SimplePathfinding
                 GUI.enabled = false;
             }
 
+            EditorGUI.BeginChangeCheck();
+
             if (typesFoldout)
             {
                 int visibleCount = 0;
@@ -47,7 +49,8 @@ namespace SimplePathfinding
                 EditorGUILayout.EndScrollView();
             }
 
-            if (GUI.changed) EditorUtility.SetDirty(requester);
+            if (EditorGUI.EndChangeCheck())
+                EditorUtility.SetDirty(requester);
             //GUI.enabled = true;
         }
     }

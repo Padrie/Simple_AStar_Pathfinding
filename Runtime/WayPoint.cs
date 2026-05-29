@@ -7,12 +7,15 @@ namespace SimplePathfinding
     public class WayPoint : MonoBehaviour, IAStarPoint
     {
         public bool isWalkable = true;
-        [Range(0.5f, 2f)]public float weight = 1f;
+        [Range(0.1f, 3f)]public float weight = 1f;
         [HideInInspector] public List<Vector3> serializedNeighbors = new();
         [System.NonSerialized] List<IAStarPoint> neighbors = new();
         [HideInInspector] public bool[] allowedAgentTypes = new bool[30];
 
-        public Vector3 Position => transform.position;
+        [System.NonSerialized] public Vector3 cachedPosition;
+
+        public Vector3 Position => cachedPosition; // Because of Async, transform.position is apart of the Unity API
+
 
         public bool Walkable { get => isWalkable; set => isWalkable = value; }
 
@@ -20,10 +23,17 @@ namespace SimplePathfinding
 
         public float Weight { get => weight; set => weight = Mathf.Clamp(value, 0.5f, 2f); }
 
-        public bool[] AllowedAgentTypes => allowedAgentTypes;
+        public bool[] AllowedAgentTypes { get => allowedAgentTypes; set => allowedAgentTypes = value; }
+
+        private void Awake()
+        {
+            cachedPosition = transform.position;
+        }
 
         private void OnValidate()
         {
+            cachedPosition = transform.position;
+
             if (allowedAgentTypes == null || allowedAgentTypes.Length != 30)
             {
                 allowedAgentTypes = new bool[30];

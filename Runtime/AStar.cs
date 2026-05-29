@@ -14,8 +14,9 @@ namespace SimplePathfinding
         [SerializeField] PathFindingStyle pathfindingStyle;
 
         [Header("Chunk Settings")]
-        [SerializeField] int chunkSize = 10;
-        [SerializeField] Dictionary<Vector3Int, PointChunk> waypointChunks = new();
+        public int chunkSize = 10;
+        public Dictionary<Vector3Int, PointChunk> waypointChunks = new();
+        public bool drawChunkGizmos = true;
 
         [Header("K Nearest")]
         [SerializeField] LayerMask obstacleMask;
@@ -35,7 +36,14 @@ namespace SimplePathfinding
 
         private void Awake()
         {
-            Instance = this;
+            if (Instance != null && Instance != this)
+            {
+                Destroy(this);
+            }
+            else
+            {
+                Instance = this;
+            }
 
             PopulatePointList();
             PopulateWaypointChunks();
@@ -56,17 +64,13 @@ namespace SimplePathfinding
 
         private void Start()
         {
-            //GetWaypointNeighbors();
-            //GetGridNeighbors();
-
-            //ConnectNeighbors();
-            //ConnectGridBoundries();
-
             PopulatePointNeighbors();
         }
 
         public void SetupPoints()
         {
+            ClearPoints();
+
             RefreshPatrolPoints();
             RefreshGridPoints();
 
@@ -77,14 +81,14 @@ namespace SimplePathfinding
             ConnectGridBoundries();
 
             SaveNeighborKeys();
+
+            PopulateWaypointChunks();
         }
 
         public void RefreshPoints()
         {
             RefreshPatrolPoints();
             RefreshGridPoints();
-
-            Debug.Log("Points refreshed. Total points: " + aStarPoints.Count);
         }
 
         public void RefreshPatrolPoints()
@@ -96,8 +100,6 @@ namespace SimplePathfinding
             {
                 waypointList.Add(points[i]);
             }
-
-            Debug.Log("Way Points refreshed. Total points: " + waypointList.Count);
         }
 
         public void RefreshGridPoints()
@@ -108,16 +110,12 @@ namespace SimplePathfinding
 
             for (int i = 0; i < grids.Length; i++)
             {
-                var points = grids[i].GetGridPoints();
-                gridList.Add(grids[i]);
-
-                for (int j = 0; j < points.Count; j++)
+                foreach (var point in grids[i].GetGridPoints())
                 {
-                    gridpointList.Add(points[j]);
+                    point.allowedAgentTypes = (bool[])grids[i].allowedAgentTypes.Clone();
+                    gridpointList.Add(point);
                 }
             }
-
-            print("Grid Points refreshed. Total points: " + gridpointList.Count);
         }
 
         public void PopulatePointList()
@@ -231,7 +229,7 @@ namespace SimplePathfinding
             gridList.Clear();
         }
 
-        public void CalculatePath(AStarPathRequest aStarPathRequest, Color randomColor)
+        public void CalculatePath(AStarPathRequest aStarPathRequest)
         {
             if (aStarPathRequest.startPoint == null || aStarPathRequest.endPoint == null)
             {
@@ -265,7 +263,7 @@ namespace SimplePathfinding
 
                 if (currentAStarPoint == aStarPathRequest.endPoint)
                 {
-                    aStarPathRequest.aStarPointPath = ReconstructPath(currentAStarPoint, aStarPathRequest, randomColor);
+                    aStarPathRequest.aStarPointPath = ReconstructPath(currentAStarPoint, aStarPathRequest);
                     calculatingPath = false;
                     break;
                 }
@@ -313,7 +311,7 @@ namespace SimplePathfinding
             }
         }
 
-        public List<IAStarPoint> ReconstructPath(IAStarPoint current, AStarPathRequest aStarPathRequest, Color randomColor)
+        public List<IAStarPoint> ReconstructPath(IAStarPoint current, AStarPathRequest aStarPathRequest)
         {
             List<IAStarPoint> path = new List<IAStarPoint>();
 
@@ -324,15 +322,6 @@ namespace SimplePathfinding
             }
 
             path.Reverse();
-
-            for (int i = 0; i < path.Count - 1; i++)
-            {
-                if (path[i] != null)
-                {
-                    Debug.DrawLine(path[i].Position, path[i + 1].Position, randomColor, .1f);
-                }
-            }
-
             return path;
         }
 
@@ -452,7 +441,6 @@ namespace SimplePathfinding
                 foreach (var neighbor in point.Neighbors)
                 {
                     var diff = neighbor.Position - point.Position;
-                    // diagonal = differs on 2+ axes
                     int axisCount = 0;
                     if (Mathf.Abs(diff.x) > 0.01f) axisCount++;
                     if (Mathf.Abs(diff.y) > 0.01f) axisCount++;
@@ -622,7 +610,18 @@ namespace SimplePathfinding
 
         public IAStarPoint SelectRandomPatrolPoint(Vector3 pos)
         {
-            return aStarPoints[Random.Range(0, aStarPoints.Count - 1)];
+            List<IAStarPoint> pointsInRadius = new List<IAStarPoint>();
+
+            foreach (var point in aStarPoints)
+            {
+                if (Vector3.Distance(point.Position, pos) <= selectRandomPointAroundPlayer)
+                    pointsInRadius.Add(point);
+            }
+
+            if (pointsInRadius.Count == 0)
+                return aStarPoints[Random.Range(0, aStarPoints.Count)];
+
+            return pointsInRadius[Random.Range(0, pointsInRadius.Count)];
         }
 
         private float SetH(Vector3 a, Vector3 b)
@@ -640,7 +639,7 @@ namespace SimplePathfinding
             }
         }
 
-        private Vector3Int ConvertToChunkCoord(Vector3 pos)
+        public Vector3Int ConvertToChunkCoord(Vector3 pos)
         {
             int x = Mathf.FloorToInt(pos.x / chunkSize);
             int y = Mathf.FloorToInt(pos.y / chunkSize);

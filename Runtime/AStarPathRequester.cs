@@ -1,5 +1,7 @@
 using SimplePathfinding;
 using System.Collections;
+using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace SimplePathfinding
@@ -17,11 +19,15 @@ namespace SimplePathfinding
 
         [HideInInspector] public bool[] agentTypes = new bool[30];
 
+        CancellationTokenSource cts;
+
         private void Start()
         {
+            cts = new CancellationTokenSource();
+
             randomPoint = AStar.Instance.SelectRandomPatrolPoint(transform.position);
             randomColor = new Color(Random.Range(0.3f, 1f), Random.Range(0.3f, 1f), Random.Range(0.3f, 1f));
-            StartCoroutine(Clock());
+            Clock();
             StartCoroutine(SelectRandomPosition());
         }
 
@@ -38,23 +44,42 @@ namespace SimplePathfinding
         {
             while (true)
             {
-                if(selectRandomPositionOnRuntime)
+                if (selectRandomPositionOnRuntime)
                     randomPoint = AStar.Instance.SelectRandomPatrolPoint(transform.position);
 
                 yield return new WaitForSeconds(1f);
             }
         }
 
-        IEnumerator Clock()
+        async void Clock()
         {
-            while (true)
+            while (!cts.IsCancellationRequested)
             {
                 aStarPathRequest.ClearCosts();
-                aStarPathRequest.RequestPath(
-                    AStar.Instance.GetNearestPoint(transform.position), randomPoint, randomColor, agentTypes);
-                yield return new WaitForSeconds(0.1f);
+                if (endPoint == null)
+                {
+                    await aStarPathRequest.RequestPathAsync(
+                        AStar.Instance.GetNearestPoint(transform.position), randomPoint, agentTypes);
+                }
+                else
+                {
+                    await aStarPathRequest.RequestPathAsync(
+                        AStar.Instance.GetNearestPoint(transform.position), endPoint, agentTypes);
+                }
 
+                    var path = aStarPathRequest.aStarPointPath;
+                for (int i = 0; i < path.Count - 1; i++)
+                    Debug.DrawLine(path[i].Position, path[i + 1].Position, randomColor, 0.15f);
+
+
+                await Task.Delay(100);
             }
+        }
+
+        private void OnDestroy()
+        {
+            cts.Cancel();
+            cts.Dispose();
         }
     }
 }
