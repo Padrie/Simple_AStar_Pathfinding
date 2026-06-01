@@ -20,7 +20,7 @@ namespace SimplePathfinding
 
         public List<IAStarPoint> Neighbors => neighbors;
 
-        public float Weight { get => weight; set => weight = Mathf.Clamp(value, 0.5f, 2f); }
+        public float Weight { get => weight; set => weight = Mathf.Max(0.1f, value); }
 
         public bool[] AllowedAgentTypes { get => allowedAgentTypes; set => allowedAgentTypes = value; }
 

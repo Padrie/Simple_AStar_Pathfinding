@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -13,14 +14,16 @@ namespace SimplePathfinding
         [SerializeField] bool walkableValue = true;
 
         [SerializeField] bool overrideWeight = false;
-        [SerializeField, Range(0.1f, 3f)] float weightValue = 1f;
+        [Tooltip("Default is 1"), SerializeField, Min(0.1f)] float weightValue = 1f;
 
         [SerializeField] bool overrideTypes = false;
-        [SerializeField] public bool[] allowedAgentTypes = new bool[30];
+        [HideInInspector, SerializeField] public bool[] agentTypes = new bool[30];
 
         Dictionary<IAStarPoint, PointSnapshot> affectedPoints = new();
 
         AStar aStar;
+
+        Vector3Int origin;
 
         Vector3 minWorldBounds;
         Vector3 maxWorldBounds;
@@ -32,6 +35,33 @@ namespace SimplePathfinding
             aStar = FindAnyObjectByType<AStar>();
         }
 
+        private void Start()
+        {
+            switch (mode)
+            {
+                case FilterVolumeMode.Once:
+                    ApplyToPoints();
+                    break;
+                case FilterVolumeMode.Realtime:
+                    StartCoroutine(RealtimeLoop());
+                    break;
+                case FilterVolumeMode.Volume:
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        IEnumerator RealtimeLoop()
+        {
+            while (true)
+            {
+                ApplyToPoints();
+
+                yield return new WaitForSeconds(updateInterval);
+            }
+        }
+
         public void ApplyToPoints()
         {
             volumeBounds = new Bounds(transform.position, size);
@@ -40,10 +70,11 @@ namespace SimplePathfinding
             maxWorldBounds = transform.position + size / 2;
 
             GetWaypoints();
+            GetGridPoints();
             RemoveExitedPoints();
         }
 
-        public void GetWaypoints()
+        private void GetWaypoints()
         {
             Vector3Int minChunkVec = aStar.ConvertToChunkCoord(minWorldBounds);
             Vector3Int maxChunkVec = aStar.ConvertToChunkCoord(maxWorldBounds);
@@ -71,7 +102,40 @@ namespace SimplePathfinding
             }
         }
 
-        public void RemoveExitedPoints()
+        private void GetGridPoints()
+        {
+            foreach (var grid in aStar.gridList)
+            {
+                origin = grid.GetOrigin();
+
+                int minX = Mathf.RoundToInt((minWorldBounds.x - origin.x) / grid.cellSize) * grid.cellSize + origin.x;
+                int maxX = Mathf.RoundToInt((maxWorldBounds.x - origin.x) / grid.cellSize) * grid.cellSize + origin.x;
+
+                int minY = Mathf.RoundToInt((minWorldBounds.y - origin.y) / grid.cellSize) * grid.cellSize + origin.y;
+                int maxY = Mathf.RoundToInt((maxWorldBounds.y - origin.y) / grid.cellSize) * grid.cellSize + origin.y;
+
+                int minZ = Mathf.RoundToInt((minWorldBounds.z - origin.z) / grid.cellSize) * grid.cellSize + origin.z;
+                int maxZ = Mathf.RoundToInt((maxWorldBounds.z - origin.z) / grid.cellSize) * grid.cellSize + origin.z;
+
+                for (int x = minX; x <= maxX; x += grid.cellSize)
+                {
+                    for (int y = minY; y <= maxY; y += grid.cellSize)
+                    {
+                        for (int z = minZ; z <= maxZ; z += grid.cellSize)
+                        {
+                            Vector3Int coord = new Vector3Int(x, y, z);
+
+                            if (grid.storedGridPoints.TryGetValue(coord, out var point))
+                            {
+                                ApplyPoint(point);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private void RemoveExitedPoints()
         {
             List<IAStarPoint> toRemove = new List<IAStarPoint>();
             foreach (var kvp in affectedPoints)
@@ -89,19 +153,31 @@ namespace SimplePathfinding
             }
         }
 
-        public void ApplyPoint(IAStarPoint point)
+        private void ApplyPoint(IAStarPoint point)
         {
             if (affectedPoints.ContainsKey(point)) return;
             affectedPoints.Add(point, new PointSnapshot(point));
 
             if (overrideWalkable) point.Walkable = walkableValue;
             if (overrideWeight) point.Weight = weightValue;
-            if (overrideTypes) point.AllowedAgentTypes = (bool[])allowedAgentTypes.Clone();
+            if (overrideTypes) point.AllowedAgentTypes = (bool[])agentTypes.Clone();
         }
 
-        public bool IsWaypointInBounds(Vector3 pos)
+        private bool IsWaypointInBounds(Vector3 pos)
         {
             return volumeBounds.Contains(pos);
+        }
+
+        private void OnDestroy()
+        {
+            foreach (var point in affectedPoints)
+                point.Value.Restore();
+            affectedPoints.Clear();
+        }
+
+        public void OnDrawGizmos()
+        {
+            Gizmos.DrawWireCube(transform.position, size);
         }
     }
 }

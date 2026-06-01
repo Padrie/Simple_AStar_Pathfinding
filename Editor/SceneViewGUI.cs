@@ -6,7 +6,7 @@ namespace SimplePathfinding
     [InitializeOnLoad]
     public static class SceneViewGUI
     {
-        static float smoothedFPS = 0;
+        static AStar aStar;
 
         static SceneViewGUI()
         {
@@ -15,12 +15,9 @@ namespace SimplePathfinding
 
         static void OnSceneGUI(SceneView sceneView)
         {
-            Handles.BeginGUI();
-            smoothedFPS = Mathf.Lerp(smoothedFPS, 1f / Time.unscaledDeltaTime, Time.unscaledDeltaTime * 5);
-            GUI.Label(new Rect(50, 10, 200, 20), "FPS: " + smoothedFPS.ToString("F1"));
-            Handles.EndGUI();
+            if (aStar == null)
+                aStar = Object.FindAnyObjectByType<AStar>();
 
-            AStar aStar = Object.FindAnyObjectByType<AStar>();
             if (aStar == null || !aStar.drawChunkGizmos) return;
 
             Handles.color = new Color(0f, 1f, 1f, 0.3f);

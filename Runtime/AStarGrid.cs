@@ -12,7 +12,7 @@ namespace SimplePathfinding
         public int cellSize = 2;
 
         public Dictionary<Vector3Int, GridPoint> storedGridPoints = new();
-        [SerializeField, HideInInspector] List<Vector3Int> pointPositions = new List<Vector3Int>();
+        [SerializeField, HideInInspector] List<Vector3Int> pointPositions = new();
 
         public bool drawGizmos = true;
         public int gizmoDrawRange = 10;

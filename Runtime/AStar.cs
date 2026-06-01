@@ -32,7 +32,7 @@ namespace SimplePathfinding
 
         [HideInInspector] public List<WayPoint> waypointList = new List<WayPoint>();
         [HideInInspector] public List<GridPoint> gridpointList = new List<GridPoint>();
-        [SerializeField, HideInInspector] List<AStarGrid> gridList = new List<AStarGrid>();
+        [HideInInspector] public List<AStarGrid> gridList = new List<AStarGrid>();
 
         private void Awake()
         {
@@ -85,13 +85,7 @@ namespace SimplePathfinding
             PopulateWaypointChunks();
         }
 
-        public void RefreshPoints()
-        {
-            RefreshPatrolPoints();
-            RefreshGridPoints();
-        }
-
-        public void RefreshPatrolPoints()
+        private void RefreshPatrolPoints()
         {
             var points = FindObjectsByType<WayPoint>();
             waypointList.Clear();
@@ -102,7 +96,7 @@ namespace SimplePathfinding
             }
         }
 
-        public void RefreshGridPoints()
+        private void RefreshGridPoints()
         {
             var grids = FindObjectsByType<AStarGrid>();
             gridpointList.Clear();
@@ -110,6 +104,7 @@ namespace SimplePathfinding
 
             for (int i = 0; i < grids.Length; i++)
             {
+                gridList.Add(grids[i]);
                 foreach (var point in grids[i].GetGridPoints())
                 {
                     point.allowedAgentTypes = (bool[])grids[i].allowedAgentTypes.Clone();
@@ -195,7 +190,7 @@ namespace SimplePathfinding
             }
         }
 
-        public void SaveNeighborKeys()
+        private void SaveNeighborKeys()
         {
             foreach (var point in waypointList)
             {
@@ -229,7 +224,7 @@ namespace SimplePathfinding
             gridList.Clear();
         }
 
-        public void CalculatePath(AStarPathRequest aStarPathRequest)
+        public void CalculatePath(PathRequest aStarPathRequest)
         {
             if (aStarPathRequest.startPoint == null || aStarPathRequest.endPoint == null)
             {
@@ -247,11 +242,6 @@ namespace SimplePathfinding
 
             while (calculatingPath)
             {
-                if (aStarPathRequest.openAStarPoints.Count == 0)
-                {
-                    Debug.LogWarning("Open list is empty");
-                }
-
                 IAStarPoint currentAStarPoint = aStarPathRequest.openAStarPoints.Dequeue();
                 if (currentAStarPoint == null) break;
                 aStarPathRequest.openSet.Remove(currentAStarPoint);
@@ -273,12 +263,13 @@ namespace SimplePathfinding
                     foreach (IAStarPoint neighbor in currentAStarPoint.Neighbors)
                     {
                         if (neighbor == null) continue;
-                        if (aStarPathRequest.closedAStarPoints.Contains(neighbor))
-                        {
-                            continue;
-                        }
 
+                        if (!neighbor.Walkable) continue;
+
+                        if (aStarPathRequest.closedAStarPoints.Contains(neighbor)) continue;
+                        
                         bool allowed = false;
+
                         for (int i = 0; i < 30; i++)
                         {
                             if (aStarPathRequest.agentTypes[i] && neighbor.AllowedAgentTypes[i])
@@ -311,7 +302,7 @@ namespace SimplePathfinding
             }
         }
 
-        public List<IAStarPoint> ReconstructPath(IAStarPoint current, AStarPathRequest aStarPathRequest)
+        private List<IAStarPoint> ReconstructPath(IAStarPoint current, PathRequest aStarPathRequest)
         {
             List<IAStarPoint> path = new List<IAStarPoint>();
 
@@ -325,7 +316,7 @@ namespace SimplePathfinding
             return path;
         }
 
-        public void GetWaypointNeighbors()
+        private void GetWaypointNeighbors()
         {
             int n = waypointList.Count;
             Vector3[] positions = new Vector3[n];
@@ -402,7 +393,7 @@ namespace SimplePathfinding
             }
         }
 
-        public void GetGridNeighbors()
+        private void GetGridNeighbors()
         {
             foreach (var grid in gridList)
             {
@@ -449,7 +440,7 @@ namespace SimplePathfinding
                 }
         }
 
-        void ConnectGridBoundries()
+        private void ConnectGridBoundries()
         {
             foreach (var gridA in gridList)
             {
@@ -492,7 +483,7 @@ namespace SimplePathfinding
             }
         }
 
-        void AddGridNeighbor(GridPoint currentPoint, GridPoint neighbor, Vector3 dir, int length)
+        private void AddGridNeighbor(GridPoint currentPoint, GridPoint neighbor, Vector3 dir, int length)
         {
             Vector3 from = currentPoint.Position + dir.normalized * 0.1f;
 
@@ -511,7 +502,7 @@ namespace SimplePathfinding
             }
         }
 
-        public void ConnectNeighbors()
+        private void ConnectNeighbors()
         {
             foreach (var waypoint in waypointList)
             {
@@ -608,7 +599,7 @@ namespace SimplePathfinding
             else return null;
         }
 
-        public IAStarPoint SelectRandomPatrolPoint(Vector3 pos)
+        public IAStarPoint SelectRandomPoint(Vector3 pos)
         {
             List<IAStarPoint> pointsInRadius = new List<IAStarPoint>();
 

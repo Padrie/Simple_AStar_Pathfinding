@@ -7,7 +7,7 @@ namespace SimplePathfinding
     public class WayPoint : MonoBehaviour, IAStarPoint
     {
         public bool isWalkable = true;
-        [Range(0.1f, 3f)]public float weight = 1f;
+        [Tooltip("Default is 1"), Min(0.1f)]public float weight = 1f;
         [HideInInspector] public List<Vector3> serializedNeighbors = new();
         [System.NonSerialized] List<IAStarPoint> neighbors = new();
         [HideInInspector] public bool[] allowedAgentTypes = new bool[30];
