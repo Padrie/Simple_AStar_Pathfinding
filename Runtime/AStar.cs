@@ -10,7 +10,7 @@ namespace SimplePathfinding
 
         List<IAStarPoint> aStarPoints = new();
         [SerializeField] float selectRandomPointAroundPlayer = 20f;
-        [SerializeField] bool drawGizmos = true;
+        //[SerializeField] bool drawGizmos = true;
         [SerializeField] PathFindingStyle pathfindingStyle;
 
         [Header("Chunk Settings")]
@@ -39,11 +39,10 @@ namespace SimplePathfinding
             if (Instance != null && Instance != this)
             {
                 Destroy(this);
+                return;
             }
             else
-            {
                 Instance = this;
-            }
 
             PopulatePointList();
             PopulateWaypointChunks();
@@ -60,10 +59,7 @@ namespace SimplePathfinding
                     }
 
             aStarPoints.RemoveAll(x => x == null);
-        }
 
-        private void Start()
-        {
             PopulatePointNeighbors();
         }
 
@@ -237,23 +233,23 @@ namespace SimplePathfinding
             aStarPathRequest.SetCosts(aStarPathRequest.startPoint, 0,
                     SetH(aStarPathRequest.startPoint.Position, aStarPathRequest.endPoint.Position), null);
 
-            aStarPathRequest.openAStarPoints.Enqueue(
+            aStarPathRequest.openPoints.Enqueue(
                 aStarPathRequest.startPoint, aStarPathRequest.GetF(aStarPathRequest.startPoint));
 
             while (calculatingPath)
             {
-                IAStarPoint currentAStarPoint = aStarPathRequest.openAStarPoints.Dequeue();
+                IAStarPoint currentAStarPoint = aStarPathRequest.openPoints.Dequeue();
                 if (currentAStarPoint == null) break;
                 aStarPathRequest.openSet.Remove(currentAStarPoint);
 
-                if (aStarPathRequest.closedAStarPoints.Contains(currentAStarPoint))
+                if (aStarPathRequest.closedPoints.Contains(currentAStarPoint))
                     continue;
 
-                aStarPathRequest.closedAStarPoints.Add(currentAStarPoint);
+                aStarPathRequest.closedPoints.Add(currentAStarPoint);
 
                 if (currentAStarPoint == aStarPathRequest.endPoint)
                 {
-                    aStarPathRequest.aStarPointPath = ReconstructPath(currentAStarPoint, aStarPathRequest);
+                    aStarPathRequest.pointPath = ReconstructPath(currentAStarPoint, aStarPathRequest);
                     calculatingPath = false;
                     break;
                 }
@@ -266,7 +262,7 @@ namespace SimplePathfinding
 
                         if (!neighbor.Walkable) continue;
 
-                        if (aStarPathRequest.closedAStarPoints.Contains(neighbor)) continue;
+                        if (aStarPathRequest.closedPoints.Contains(neighbor)) continue;
                         
                         bool allowed = false;
 
@@ -292,7 +288,7 @@ namespace SimplePathfinding
                         if (isNewNode || tentativeG < aStarPathRequest.GetG(neighbor))
                         {
                             aStarPathRequest.SetCosts(neighbor, tentativeG, SetH(neighbor.Position, aStarPathRequest.endPoint.Position), currentAStarPoint);
-                            aStarPathRequest.openAStarPoints.Enqueue(neighbor, aStarPathRequest.GetF(neighbor));
+                            aStarPathRequest.openPoints.Enqueue(neighbor, aStarPathRequest.GetF(neighbor));
 
                             if (isNewNode)
                                 aStarPathRequest.openSet.Add(neighbor);
@@ -426,18 +422,6 @@ namespace SimplePathfinding
                 foreach (var point in grid.storedGridPoints)
                     totalNeighbors += point.Value.Neighbors.Count;
             }
-
-            int diagonalConnections = 0;
-            foreach (var point in gridpointList)
-                foreach (var neighbor in point.Neighbors)
-                {
-                    var diff = neighbor.Position - point.Position;
-                    int axisCount = 0;
-                    if (Mathf.Abs(diff.x) > 0.01f) axisCount++;
-                    if (Mathf.Abs(diff.y) > 0.01f) axisCount++;
-                    if (Mathf.Abs(diff.z) > 0.01f) axisCount++;
-                    if (axisCount >= 2) diagonalConnections++;
-                }
         }
 
         private void ConnectGridBoundries()
@@ -533,7 +517,7 @@ namespace SimplePathfinding
             }
         }
 
-        public IAStarPoint GetNearestPoint(Vector3 pos)
+        internal IAStarPoint GetNearestPoint(Vector3 pos)
         {
             foreach (var grid in gridList)
             {
@@ -550,7 +534,7 @@ namespace SimplePathfinding
             return GetNearestWayPoint(pos);
         }
 
-        public IAStarPoint GetNearestWayPoint(Vector3 pos)
+        internal IAStarPoint GetNearestWayPoint(Vector3 pos)
         {
             if (aStarPoints == null || aStarPoints.Count == 0) return null;
 
@@ -585,7 +569,7 @@ namespace SimplePathfinding
             return smallestDistanceObject;
         }
 
-        public IAStarPoint GetNearestGridPoint(Vector3 pos, AStarGrid grid)
+        internal IAStarPoint GetNearestGridPoint(Vector3 pos, AStarGrid grid)
         {
             Vector3Int origin = grid.GetOrigin();
             Vector3Int nearestKey = new Vector3Int(
@@ -599,7 +583,7 @@ namespace SimplePathfinding
             else return null;
         }
 
-        public IAStarPoint SelectRandomPoint(Vector3 pos)
+        internal IAStarPoint SelectRandomPoint(Vector3 pos)
         {
             List<IAStarPoint> pointsInRadius = new List<IAStarPoint>();
 
@@ -615,6 +599,15 @@ namespace SimplePathfinding
             return pointsInRadius[Random.Range(0, pointsInRadius.Count)];
         }
 
+        public Vector3Int ConvertToChunkCoord(Vector3 pos)
+        {
+            int x = Mathf.FloorToInt(pos.x / chunkSize);
+            int y = Mathf.FloorToInt(pos.y / chunkSize);
+            int z = Mathf.FloorToInt(pos.z / chunkSize);
+
+            return new Vector3Int(x, y, z);
+        }
+
         private float SetH(Vector3 a, Vector3 b)
         {
             switch (pathfindingStyle)
@@ -628,15 +621,6 @@ namespace SimplePathfinding
                 default:
                     return (a - b).magnitude;
             }
-        }
-
-        public Vector3Int ConvertToChunkCoord(Vector3 pos)
-        {
-            int x = Mathf.FloorToInt(pos.x / chunkSize);
-            int y = Mathf.FloorToInt(pos.y / chunkSize);
-            int z = Mathf.FloorToInt(pos.z / chunkSize);
-
-            return new Vector3Int(x, y, z);
         }
     }
 }

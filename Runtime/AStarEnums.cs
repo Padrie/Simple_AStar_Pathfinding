@@ -13,6 +13,13 @@ namespace SimplePathfinding
     {
         Once,
         Realtime,
-        Volume
+        Manual
+    }
+
+    public enum PathRequestMode
+    {
+        Once,
+        Realtime,
+        Manual
     }
 }

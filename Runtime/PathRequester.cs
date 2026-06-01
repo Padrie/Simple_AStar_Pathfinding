@@ -1,5 +1,4 @@
-using SimplePathfinding;
-using System.Collections;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -8,27 +7,80 @@ namespace SimplePathfinding
 {
     public class PathRequester : MonoBehaviour
     {
-        PathRequest aStarPathRequest = new();
+        PathRequest pathRequest = new();
 
         public WayPoint endPoint;
-        IAStarPoint randomPoint;
+        [SerializeField] PathRequestMode startupBehaviour = PathRequestMode.Realtime;
+        [Tooltip("Seconds between path requests"), SerializeField, Min(0.001f)] float updateInterval = 0.1f;
 
-        Color randomColor;
-
-        public bool selectRandomPositionOnRuntime = false;
-
+        [SerializeField] bool selectRandomPointOnStart = false;
+        [SerializeField] bool drawPath = true;
         [HideInInspector] public bool[] agentTypes = new bool[30];
 
+        IAStarPoint randomPoint;
+        Color randomColor;
+        List<IAStarPoint> currentPath;
         CancellationTokenSource cts;
+        bool isRequesting = true;
+        bool isGettingPath;
+
+        public IReadOnlyList<IAStarPoint> Path => currentPath;
+        public event System.Action<List<IAStarPoint>> OnPathReady;
+
+        int pathIndex = 0;
+
+        public Vector3 CurrentPoint => (currentPath != null && pathIndex < currentPath.Count)
+            ? currentPath[pathIndex].Position
+            : transform.position;
+
+        public bool HasPath => currentPath != null && currentPath.Count > 0;
+        public bool HasReachedEnd => currentPath == null || pathIndex >= currentPath.Count - 1;
+        public float PathLength
+        {
+            get
+            {
+                if (currentPath == null || currentPath.Count < 2) return 0f;
+
+                float total = 0f;
+
+                for (int i = 0; i < currentPath.Count - 1; i++)
+                {
+                    total += Vector3.Distance(currentPath[i].Position, currentPath[i + 1].Position);
+                }
+
+                return total;
+            }
+        }
+
+        private void Awake()
+        {
+            cts = new CancellationTokenSource();
+        }
 
         private void Start()
         {
-            cts = new CancellationTokenSource();
+            if (selectRandomPointOnStart && endPoint == null)
+                randomPoint = AStar.Instance.SelectRandomPoint(transform.position);
 
-            randomPoint = AStar.Instance.SelectRandomPoint(transform.position);
             randomColor = new Color(Random.Range(0.3f, 1f), Random.Range(0.3f, 1f), Random.Range(0.3f, 1f));
-            Clock();
-            StartCoroutine(SelectRandomPosition());
+
+            switch (startupBehaviour)
+            {
+                case PathRequestMode.Once:
+                    isRequesting = false;
+                    RequestPath();
+                    break;
+                case PathRequestMode.Realtime:
+                    isRequesting = true;
+                    break;
+                case PathRequestMode.Manual:
+                    isRequesting = false;
+                    break;
+                default:
+                    break;
+            }
+
+            Loop();
         }
 
         private void OnValidate()
@@ -40,40 +92,80 @@ namespace SimplePathfinding
             if (!anyTrue) agentTypes[0] = true;
         }
 
-        IEnumerator SelectRandomPosition()
+        private void Update()
         {
-            while (true)
-            {
-                if (selectRandomPositionOnRuntime)
-                    randomPoint = AStar.Instance.SelectRandomPoint(transform.position);
+            if (!drawPath || currentPath == null) return;
 
-                yield return new WaitForSeconds(1f);
+            for (int i = 0; i < currentPath.Count - 1; i++)
+                Debug.DrawLine(currentPath[i].Position, currentPath[i + 1].Position, randomColor, 0f);
+        }
+
+        private async Task DoRequest()
+        {
+            if (isGettingPath) return;
+            isGettingPath = true;
+
+            try
+            {
+                pathRequest.ClearCosts();
+
+                IAStarPoint target = endPoint != null ? endPoint : randomPoint;
+
+                await pathRequest.RequestPathAsync(
+                    AStar.Instance.GetNearestPoint(transform.position), target, agentTypes);
+
+                currentPath = new List<IAStarPoint>(pathRequest.pointPath);
+
+                pathIndex = 0;
+                if (currentPath.Count > 0)
+                    OnPathReady?.Invoke(currentPath);
+            }
+            finally
+            {
+                isGettingPath = false;
             }
         }
 
-        async void Clock()
+        public async void RequestPath()
+        {
+            if (cts.IsCancellationRequested) return;
+            await DoRequest();
+        }
+
+        private async void Loop()
         {
             while (!cts.IsCancellationRequested)
             {
-                aStarPathRequest.ClearCosts();
-                if (endPoint == null)
-                {
-                    await aStarPathRequest.RequestPathAsync(
-                        AStar.Instance.GetNearestPoint(transform.position), randomPoint, agentTypes);
-                }
-                else
-                {
-                    await aStarPathRequest.RequestPathAsync(
-                        AStar.Instance.GetNearestPoint(transform.position), endPoint, agentTypes);
-                }
-
-                var path = aStarPathRequest.aStarPointPath;
-                for (int i = 0; i < path.Count - 1; i++)
-                    Debug.DrawLine(path[i].Position, path[i + 1].Position, randomColor, 0.15f);
-
-                await Task.Delay(100);
+                if (isRequesting)
+                    await DoRequest();
+                await Task.Delay(Mathf.RoundToInt(updateInterval * 1000));
             }
         }
+
+        public bool TryGetNearestPoint(out Vector3 position)
+        {
+            var point = AStar.Instance.GetNearestPoint(transform.position);
+
+            if (AStar.Instance == null)
+            {
+                position = default;
+                return false;
+            }
+
+            position = point.Position;
+
+            return true;
+        }
+
+        public bool AdvancePoint()
+        {
+            if (currentPath == null || pathIndex >= currentPath.Count - 1) return false;
+            pathIndex++;
+            return true;
+        }
+
+        public void StopRequesting() => isRequesting = false;
+        public void StartRequesting() => isRequesting = true;
 
         private void OnDestroy()
         {

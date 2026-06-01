@@ -10,11 +10,18 @@ namespace SimplePathfinding
         [SerializeField] FilterVolumeMode mode = FilterVolumeMode.Once;
         [SerializeField] float updateInterval = 0.1f;
 
+        [Space(10)]
+
         [SerializeField] bool overrideWalkable = false;
         [SerializeField] bool walkableValue = true;
 
+        [Space(10)]
+
+
         [SerializeField] bool overrideWeight = false;
         [Tooltip("Default is 1"), SerializeField, Min(0.1f)] float weightValue = 1f;
+
+        [Space(10)]
 
         [SerializeField] bool overrideTypes = false;
         [HideInInspector, SerializeField] public bool[] agentTypes = new bool[30];
@@ -45,7 +52,7 @@ namespace SimplePathfinding
                 case FilterVolumeMode.Realtime:
                     StartCoroutine(RealtimeLoop());
                     break;
-                case FilterVolumeMode.Volume:
+                case FilterVolumeMode.Manual:
                     break;
                 default:
                     break;
@@ -163,16 +170,54 @@ namespace SimplePathfinding
             if (overrideTypes) point.AllowedAgentTypes = (bool[])agentTypes.Clone();
         }
 
+        public void ReapplyAll()
+        {
+            Clear();
+            ApplyToPoints();
+        }
+
         private bool IsWaypointInBounds(Vector3 pos)
         {
             return volumeBounds.Contains(pos);
         }
 
-        private void OnDestroy()
+        public void Clear()
         {
             foreach (var point in affectedPoints)
                 point.Value.Restore();
             affectedPoints.Clear();
+        }
+
+        public void SetWeight(float weight)
+        {
+            weightValue = weight;
+            overrideWeight = true;
+            ReapplyAll();
+        }
+
+        public void SetWalkable(bool walkable)
+        {
+            walkableValue = walkable;
+            overrideWalkable = true;
+            ReapplyAll();
+        }
+
+        public void SetAgentType(string type, bool value)
+        {
+            int index = System.Array.IndexOf(aStar.agentTypes, type);
+            if (index < 0)
+            {
+                Debug.LogWarning($"Filter Volume ({this}): Agent type {type} not found");
+                return;
+            }
+            agentTypes[index] = value;
+            overrideTypes = true;
+            ReapplyAll();
+        }
+
+        private void OnDestroy()
+        {
+            Clear();
         }
 
         public void OnDrawGizmos()

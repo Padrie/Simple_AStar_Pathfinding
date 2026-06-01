@@ -1,7 +1,10 @@
 using System.Collections.Generic;
 using System.Linq;
-using UnityEditor;
 using UnityEngine;
+
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace SimplePathfinding
 {
@@ -106,7 +109,9 @@ namespace SimplePathfinding
             if (!drawGizmos) return;
             VolumeGizmo();
             if (storedGridPoints.Count == 0) return;
+#if UNITY_EDITOR
             GridPointGizmoDrawDistance();
+#endif
         }
 
         private void VolumeGizmo()
@@ -114,6 +119,7 @@ namespace SimplePathfinding
             Gizmos.DrawWireCube(transform.position, gridSize);
         }
 
+#if UNITY_EDITOR
         private void GridPointGizmoDrawDistance()
         {
             Camera sceneCam = SceneView.currentDrawingSceneView?.camera;
@@ -133,5 +139,6 @@ namespace SimplePathfinding
                             Gizmos.DrawCube(point.Position, Vector3.one / 5);
                         }
         }
+#endif
     }
 }

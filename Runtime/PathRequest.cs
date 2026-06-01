@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -7,31 +6,31 @@ namespace SimplePathfinding
 {
     public class PathRequest
     {
-        public Dictionary<IAStarPoint, (float g,float h, IAStarPoint cameFrom)> storedCosts = new();
-        public List<IAStarPoint> aStarPointPath = new();
+        internal Dictionary<IAStarPoint, (float g,float h, IAStarPoint cameFrom)> storedCosts = new();
+        internal List<IAStarPoint> pointPath = new();
 
-        public IAStarPoint startPoint;
-        public IAStarPoint endPoint;
+        internal IAStarPoint startPoint;
+        internal IAStarPoint endPoint;
 
-        public PriorityQueue<IAStarPoint> openAStarPoints = new PriorityQueue<IAStarPoint>();
-        public HashSet<IAStarPoint> openSet = new HashSet<IAStarPoint>();
-        public HashSet<IAStarPoint> closedAStarPoints = new HashSet<IAStarPoint>();
+        internal PriorityQueue<IAStarPoint> openPoints = new PriorityQueue<IAStarPoint>();
+        internal HashSet<IAStarPoint> openSet = new HashSet<IAStarPoint>();
+        internal HashSet<IAStarPoint> closedPoints = new HashSet<IAStarPoint>();
 
-        [HideInInspector] public bool[] agentTypes = new bool[30];
+        internal bool[] agentTypes = new bool[30];
 
-        public async Task RequestPathAsync(IAStarPoint start, IAStarPoint end, bool[] agentTypes)
+        public async Task RequestPathAsync(IAStarPoint start, IAStarPoint end, bool[] types)
         {
             if (start == null || end == null) return;
 
             bool startAllowed = false;
             for (int i = 0; i < 30; i++)
-                if (agentTypes[i] && start.AllowedAgentTypes[i]) { startAllowed = true; break; }
+                if (types[i] && start.AllowedAgentTypes[i]) { startAllowed = true; break; }
 
             if (!startAllowed) return;
             
             startPoint = start;
             endPoint = end;
-            this.agentTypes = agentTypes;
+            agentTypes = types;
 
             await Task.Run(() => AStar.Instance.CalculatePath(this));
         }
@@ -44,10 +43,10 @@ namespace SimplePathfinding
         public void ClearCosts()
         {
             storedCosts.Clear();
-            aStarPointPath.Clear();
-            openAStarPoints.Clear();
+            pointPath.Clear();
+            openPoints.Clear();
             openSet.Clear();
-            closedAStarPoints.Clear();
+            closedPoints.Clear();
         }
 
         public float GetG(IAStarPoint point) => storedCosts.TryGetValue(point, out var costs) ? costs.g : float.MaxValue;

@@ -19,7 +19,6 @@ namespace SimplePathfinding
             if (astar == null) astar = FindAnyObjectByType<AStar>();
             if (astar == null) return;
 
-            EditorGUILayout.Space();
             typesFoldout = EditorGUILayout.Foldout(typesFoldout, "Agent Types", true);
 
             EditorGUI.BeginChangeCheck();
