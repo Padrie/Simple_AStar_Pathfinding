@@ -1,6 +1,6 @@
 # Simple_AStar_Pathfinding
 
-![Stamping](stamping.png)
+![Stamping](Astar1.gif)
 
 - This A Star Unity Package is an alternative to the Built in Navmesh system. It's a point based pathfinding tool that lets you have control over the path, the individual points, the path quality and more.
 
@@ -13,4 +13,4 @@
 - Filters. Assign Agent types, like Humanoid, Bird, etc. or create custom ones and select them on the Points. You also can change the walkability and weight of individual points.
 - Filter Volume. This changes the filter of points in a volume, dynamically on runtime. This could be assigned to moving cars, Players, NPC and other things the Requester has to walk around.
 
-![Stamping](stamping.png)
+![Stamping](Astar2.gif)
